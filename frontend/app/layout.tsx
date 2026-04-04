@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import BottomNav from './components/BottomNav';
+import { AuthProvider } from './context/AuthContext';
+import AppShell from './components/AppShell';
 
 export const metadata: Metadata = {
   title: '錢跡',
@@ -10,20 +11,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  themeColor: '#6c63ff',
+  width: 'device-width', initialScale: 1, maximumScale: 1, themeColor: '#6c63ff',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW">
-      <body style={{ background: 'var(--background)', minHeight: '100dvh', paddingBottom: '72px' }}>
-        <main className="max-w-lg mx-auto">
-          {children}
-        </main>
-        <BottomNav />
+      <body style={{ background: 'var(--background)', minHeight: '100dvh' }}>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

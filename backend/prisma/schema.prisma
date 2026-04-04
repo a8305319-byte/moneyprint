@@ -7,26 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum AccountType { CHECKING CREDIT CASH }
+// ── Enums ──────────────────────────────────────────────
+enum AccountType        { CHECKING CREDIT CASH }
 enum TransactionDirection { DEBIT CREDIT }
-enum LedgerSource { BANK_IMPORT INVOICE MANUAL }
-enum LedgerStatus { PENDING CATEGORIZED MATCHED }
-enum MatchStatus { PENDING CONFIRMED REJECTED }
-enum ImportStatus { QUEUED PROCESSING DONE FAILED }
+enum LedgerSource       { BANK_IMPORT INVOICE MANUAL }
+enum LedgerStatus       { PENDING CATEGORIZED MATCHED }
+enum MatchStatus        { PENDING CONFIRMED REJECTED }
+enum ImportStatus       { QUEUED PROCESSING DONE FAILED }
+enum InvoiceDirection   { RECEIVED ISSUED }
+enum InvoiceFormat      { ELECTRONIC PAPER RECEIPT CLOUD UNIFORM }
+enum TaxType            { TAXABLE ZERO_RATE EXEMPT }
+enum AppMode            { PERSONAL BUSINESS }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  accounts  Account[]
-  categories Category[]
+// ── Auth User ──────────────────────────────────────────
+model AppUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String    // bcrypt hashed
+  name         String
+  companyName  String?
+  taxId        String?   // 統一編號
+  phone        String?
+  mode         AppMode   @default(PERSONAL)
+  invoiceQuota Int       @default(0) // 可開發票張數
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  businessInvoices BusinessInvoice[]
+  categories   Category[]
+  @@index([email])
 }
 
+// ── Personal: Accounts ─────────────────────────────────
 model Account {
   id           String      @id @default(cuid())
   userId       String
-  user         User        @relation(fields: [userId], references: [id])
   name         String
   bankName     String
   accountType  AccountType @default(CHECKING)
@@ -86,7 +100,7 @@ model InvoiceRecord {
 model Category {
   id           String   @id @default(cuid())
   userId       String?
-  user         User?    @relation(fields: [userId], references: [id])
+  user         AppUser? @relation(fields: [userId], references: [id])
   name         String
   icon         String?
   color        String?
@@ -142,4 +156,27 @@ model CategoryRule {
   isRegex    Boolean  @default(false)
   createdAt  DateTime @default(now())
   @@index([categoryId])
+}
+
+// ── Business: Invoices ─────────────────────────────────
+model BusinessInvoice {
+  id                String           @id @default(cuid())
+  userId            String
+  user              AppUser          @relation(fields: [userId], references: [id])
+  direction         InvoiceDirection
+  format            InvoiceFormat    @default(ELECTRONIC)
+  invoiceNo         String
+  invoiceDate       DateTime
+  counterpartyName  String
+  counterpartyTaxId String?
+  amount            Decimal          @db.Decimal(12,2)  // 含稅
+  taxAmount         Decimal          @db.Decimal(12,2)  // 稅額 (5%)
+  untaxedAmount     Decimal          @db.Decimal(12,2)  // 未稅
+  taxType           TaxType          @default(TAXABLE)
+  description       String?
+  imageUrl          String?          // 掃描圖片 URL
+  createdAt         DateTime         @default(now())
+  @@unique([userId, invoiceNo])
+  @@index([userId, direction])
+  @@index([invoiceDate])
 }
