@@ -1,0 +1,14 @@
+# Node
+node_modules/
+.env
+.env.local
+dist/
+build/
+.next/
+
+# Prisma
+generated/
+
+# Misc
+.DS_Store
+*.log
