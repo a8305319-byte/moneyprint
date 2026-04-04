@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BankImportsModule } from './modules/bank-imports/bank-imports.module';
@@ -15,9 +14,6 @@ import { EinvoiceModule } from './modules/einvoice/einvoice.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    BullModule.forRoot({
-      redis: process.env.REDIS_URL ?? 'redis://localhost:6379',
-    }),
     PrismaModule,
     AuthModule,
     BankImportsModule,

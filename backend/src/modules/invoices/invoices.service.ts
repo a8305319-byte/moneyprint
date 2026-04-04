@@ -1,19 +1,43 @@
 import { Injectable } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import { PrismaService } from '../../prisma/prisma.service';
-import { QUEUE_INVOICE_SYNC } from '../../jobs/queues.constant';
 
 @Injectable()
 export class InvoicesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    @InjectQueue(QUEUE_INVOICE_SYNC) private readonly queue: Queue,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async enqueueSync(carrier: string) {
-    await this.queue.add('sync', { carrier });
-    return { queued: true };
+    // Process synchronously (mock data until real API key configured)
+    const mockInvoices = [
+      {
+        invoiceNo: `AB${Date.now()}`,
+        invoiceDate: new Date(),
+        sellerName: '全家便利商店',
+        sellerTaxId: '22099131',
+        amount: 85,
+        taxAmount: 4,
+        carrier,
+      },
+    ];
+
+    let count = 0;
+    for (const inv of mockInvoices) {
+      const exists = await this.prisma.invoiceRecord.findUnique({ where: { invoiceNo: inv.invoiceNo } });
+      if (exists) continue;
+      const record = await this.prisma.invoiceRecord.create({ data: inv });
+      await this.prisma.ledgerTransaction.create({
+        data: {
+          source: 'INVOICE',
+          status: 'PENDING',
+          txDate: inv.invoiceDate,
+          amount: inv.amount,
+          direction: 'DEBIT',
+          description: inv.sellerName,
+          invoiceId: record.id,
+        },
+      });
+      count++;
+    }
+    return { synced: count };
   }
 
   async list(month?: string) {
