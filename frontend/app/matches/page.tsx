@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 interface Match {
-  id: string;
-  confidence: number;
+  id: string; confidence: number;
   items: Array<{
     bankTx?: { merchant: string; txDate: string; amount: string; direction: string };
     invoice?: { sellerName: string; invoiceDate: string; amount: string };
@@ -27,8 +26,7 @@ export default function MatchesPage() {
   async function autoMatch() {
     setRunning(true);
     await fetch(`${API}/matches/auto`, { method: 'POST' });
-    await load();
-    setRunning(false);
+    await load(); setRunning(false);
   }
 
   async function confirm(id: string) {
@@ -42,61 +40,116 @@ export default function MatchesPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">配對</h1>
-        <button onClick={autoMatch} disabled={running}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg">
-          {running ? '比對中...' : '自動比對'}
-        </button>
+    <div style={{ minHeight: '100dvh', background: '#f5f6fa', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg, #f78fb3 0%, #6c63ff 100%)', padding: '52px 20px 28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px' }}>配對</div>
+          <button onClick={autoMatch} disabled={running} style={{
+            background: running ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.22)',
+            backdropFilter: 'blur(8px)',
+            border: '1.5px solid rgba(255,255,255,0.35)',
+            borderRadius: 22, color: '#fff', fontSize: 13, fontWeight: 700,
+            padding: '9px 20px', cursor: running ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {running ? (
+              <>
+                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                比對中...
+              </>
+            ) : '🔍 自動比對'}
+          </button>
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 500 }}>
+          {matches.length > 0 ? `${matches.length} 筆待確認` : '無待確認項目'}
+        </div>
       </div>
 
-      {matches.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-4xl mb-3">✅</div>
-          <div className="text-lg font-medium">沒有待配對項目</div>
-          <div className="text-sm mt-1">點擊「自動比對」開始</div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {matches.map(m => {
-            const bankItem = m.items.find(i => i.bankTx);
-            const invItem = m.items.find(i => i.invoice);
-            return (
-              <div key={m.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 grid grid-cols-2 gap-3">
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="text-xs text-blue-500 font-semibold mb-1">銀行交易</div>
-                      <div className="text-sm font-medium text-gray-800">{bankItem?.bankTx?.merchant ?? '-'}</div>
-                      <div className="text-xs text-gray-400">{bankItem?.bankTx?.txDate ? new Date(bankItem.bankTx.txDate).toLocaleDateString('zh-TW') : ''}</div>
-                      <div className="text-base font-bold text-blue-700 mt-1">NT$ {Number(bankItem?.bankTx?.amount ?? 0).toLocaleString()}</div>
+      <div style={{ padding: '16px 16px 32px' }}>
+        {matches.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>✅</div>
+            <div style={{ color: '#1a1a2e', fontSize: 18, fontWeight: 800, marginBottom: 8 }}>全部配對完成</div>
+            <div style={{ color: '#8892a4', fontSize: 13 }}>點擊自動比對開始新一輪</div>
+          </div>
+        ) : matches.map(m => {
+          const bankItem = m.items.find(i => i.bankTx);
+          const invItem = m.items.find(i => i.invoice);
+          const pct = Math.round(m.confidence * 100);
+          const confColor = pct >= 80 ? '#26de81' : pct >= 50 ? '#ffd93d' : '#ff6b6b';
+          const confBg = pct >= 80 ? '#f0fff8' : pct >= 50 ? '#fffbf0' : '#fff0f0';
+
+          return (
+            <div key={m.id} style={{
+              background: '#fff', borderRadius: 20, marginBottom: 14,
+              boxShadow: '0 4px 24px rgba(108,99,255,0.09)', overflow: 'hidden',
+            }}>
+              {/* Confidence bar */}
+              <div style={{ height: 4, background: '#f0f2f8' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: confColor, transition: 'width 0.5s ease' }} />
+              </div>
+
+              <div style={{ padding: '16px 16px 14px' }}>
+                {/* Confidence badge */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                  <div style={{
+                    background: confBg, borderRadius: 20, padding: '4px 12px',
+                    fontSize: 12, fontWeight: 800, color: confColor,
+                  }}>吻合度 {pct}%</div>
+                </div>
+
+                {/* Two-column comparison */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  {/* Bank */}
+                  <div style={{ background: '#f0f4ff', borderRadius: 14, padding: '13px 12px' }}>
+                    <div style={{ fontSize: 10, color: '#6c63ff', fontWeight: 800, marginBottom: 8, letterSpacing: '0.5px', textTransform: 'uppercase' }}>🏦 銀行</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {bankItem?.bankTx?.merchant ?? '-'}
                     </div>
-                    <div className="bg-amber-50 rounded-lg p-3">
-                      <div className="text-xs text-amber-500 font-semibold mb-1">電子發票</div>
-                      <div className="text-sm font-medium text-gray-800">{invItem?.invoice?.sellerName ?? '-'}</div>
-                      <div className="text-xs text-gray-400">{invItem?.invoice?.invoiceDate ? new Date(invItem.invoice.invoiceDate).toLocaleDateString('zh-TW') : ''}</div>
-                      <div className="text-base font-bold text-amber-700 mt-1">NT$ {Number(invItem?.invoice?.amount ?? 0).toLocaleString()}</div>
+                    <div style={{ fontSize: 11, color: '#8892a4', marginBottom: 6 }}>
+                      {bankItem?.bankTx?.txDate ? new Date(bankItem.bankTx.txDate).toLocaleDateString('zh-TW') : ''}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#6c63ff' }}>
+                      NT$ {Number(bankItem?.bankTx?.amount ?? 0).toLocaleString()}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 min-w-[90px]">
-                    <div className={`text-sm font-bold px-2 py-0.5 rounded-full ${
-                      m.confidence >= 0.8 ? 'bg-green-100 text-green-700' :
-                      m.confidence >= 0.5 ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-600'}`}>
-                      {(m.confidence * 100).toFixed(0)}% 吻合
+
+                  {/* Invoice */}
+                  <div style={{ background: '#fffbf0', borderRadius: 14, padding: '13px 12px' }}>
+                    <div style={{ fontSize: 10, color: '#ffa502', fontWeight: 800, marginBottom: 8, letterSpacing: '0.5px', textTransform: 'uppercase' }}>🧾 發票</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {invItem?.invoice?.sellerName ?? '-'}
                     </div>
-                    <button onClick={() => confirm(m.id)}
-                      className="w-full text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg">確認</button>
-                    <button onClick={() => reject(m.id)}
-                      className="w-full text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg">拒絕</button>
+                    <div style={{ fontSize: 11, color: '#8892a4', marginBottom: 6 }}>
+                      {invItem?.invoice?.invoiceDate ? new Date(invItem.invoice.invoiceDate).toLocaleDateString('zh-TW') : ''}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#ffa502' }}>
+                      NT$ {Number(invItem?.invoice?.amount ?? 0).toLocaleString()}
+                    </div>
                   </div>
                 </div>
+
+                {/* Action buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <button onClick={() => confirm(m.id)} style={{
+                    background: 'linear-gradient(135deg, #26de81 0%, #20bf6b 100%)',
+                    border: 'none', borderRadius: 13, color: '#fff',
+                    fontWeight: 700, fontSize: 14, padding: '13px', cursor: 'pointer',
+                    letterSpacing: '-0.2px',
+                  }}>✓ 確認配對</button>
+                  <button onClick={() => reject(m.id)} style={{
+                    background: '#f5f6fa', border: '1.5px solid #e8ecf4', borderRadius: 13, color: '#8892a4',
+                    fontWeight: 600, fontSize: 14, padding: '13px', cursor: 'pointer',
+                  }}>✗ 拒絕</button>
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

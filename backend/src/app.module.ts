@@ -7,6 +7,7 @@ import { InvoicesModule } from './modules/invoices/invoices.module';
 import { MatchingModule } from './modules/matching/matching.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { LedgerModule } from './modules/ledger/ledger.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     MatchingModule,
     CategoriesModule,
     ReportsModule,
+    LedgerModule,
   ],
 })
 export class AppModule {}
