@@ -41,7 +41,7 @@ export class ReportsService {
   }
 
   async getMonthlyTrend(months: number) {
-    const results = [];
+    const results: { month: string; totalExpense: number; totalIncome: number; netFlow: number; txCount: number }[] = [];
     for (let i = 0; i < months; i++) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
