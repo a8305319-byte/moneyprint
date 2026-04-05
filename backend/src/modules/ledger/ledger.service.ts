@@ -25,4 +25,72 @@ export class LedgerService {
     });
     return { data };
   }
+
+  async create(userId: string, body: {
+    description: string;
+    amount: number;
+    direction: 'DEBIT' | 'CREDIT';
+    categoryName?: string;
+    txDate?: string;
+  }) {
+    const { description, amount, direction, categoryName, txDate } = body;
+
+    if (!description || !description.trim()) throw new BadRequestException('請填寫說明');
+    if (!amount || amount <= 0) throw new BadRequestException('金額必須大於 0');
+
+    // Find or create category
+    let categoryId: string | undefined;
+    if (categoryName && categoryName.trim()) {
+      const name = categoryName.trim();
+      const existing = await this.prisma.category.findFirst({
+        where: { userId, name },
+      });
+      if (existing) {
+        categoryId = existing.id;
+      } else {
+        const ICONS: Record<string, string> = {
+          餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬',
+          通訊: '📱', 薪資: '💰', 其他: '📋',
+        };
+        const created = await this.prisma.category.create({
+          data: { userId, name, icon: ICONS[name] ?? '📋' },
+        });
+        categoryId = created.id;
+      }
+    }
+
+    const date = txDate ? new Date(txDate) : new Date();
+
+    const tx = await this.prisma.ledgerTransaction.create({
+      data: {
+        userId,
+        source: 'MANUAL',
+        status: 'CATEGORIZED',
+        txDate: date,
+        amount,
+        direction,
+        description: description.trim(),
+        categoryId,
+      },
+      include: { category: true },
+    });
+
+    // Return transaction + current month summary
+    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const range = parseMonth(monthStr)!;
+    const monthTxs = await this.prisma.ledgerTransaction.findMany({
+      where: { userId, txDate: range },
+    });
+    const totalExpense = monthTxs
+      .filter(t => t.direction === 'DEBIT')
+      .reduce((s, t) => s + Number(t.amount), 0);
+    const txCount = monthTxs.length;
+
+    return {
+      data: {
+        transaction: tx,
+        monthSummary: { totalExpense, txCount, month: monthStr },
+      },
+    };
+  }
 }

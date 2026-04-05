@@ -72,11 +72,49 @@ function mockRes(data: any): Response {
   });
 }
 
-function mockApiFetch(url: string, opts: RequestInit = {}): Response {
-  if ((opts.method ?? 'GET').toUpperCase() !== 'GET') return mockRes({ success: true });
+// Demo session state (in-memory, resets on refresh — intentional)
+const demoState = { txCount: 8, totalExpense: 28440 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
+};
+
+function mockApiFetch(url: string, opts: RequestInit = {}): Response {
+  const method = (opts.method ?? 'GET').toUpperCase();
   const path = url.split('?')[0];
-  if (path.endsWith('/reports/monthly-summary'))  return mockRes({ totalExpense: 28440, totalIncome: 55000, netFlow: 26560, txCount: 47 });
+
+  // POST /ledger — manual entry in demo
+  if (method === 'POST' && path.endsWith('/ledger')) {
+    const body = opts.body ? JSON.parse(opts.body as string) : {};
+    const amount = Number(body.amount) || 198;
+    const direction = body.direction ?? 'DEBIT';
+    const now = new Date().toISOString();
+    const month = now.slice(0, 7);
+    if (direction === 'DEBIT') {
+      demoState.totalExpense += amount;
+    }
+    demoState.txCount += 1;
+    return mockRes({
+      transaction: {
+        id: `d-${Date.now()}`, txDate: now,
+        description: body.description ?? '記帳',
+        amount: String(amount), direction,
+        category: body.categoryName
+          ? { name: body.categoryName, icon: CATEGORY_ICONS[body.categoryName] ?? '📋' }
+          : null,
+      },
+      monthSummary: {
+        totalExpense: demoState.totalExpense,
+        txCount: demoState.txCount,
+        month,
+      },
+    });
+  }
+
+  // All other writes
+  if (method !== 'GET') return mockRes({ success: true });
+
+  if (path.endsWith('/reports/monthly-summary'))  return mockRes({ totalExpense: demoState.totalExpense, totalIncome: 55000, netFlow: 55000 - demoState.totalExpense, txCount: demoState.txCount });
   if (path.endsWith('/reports/category-breakdown')) return mockRes([
     { categoryName: '餐飲', totalAmount: 8240, txCount: 18, percentage: 29.0 },
     { categoryName: '購物', totalAmount: 6890, txCount: 7,  percentage: 24.2 },

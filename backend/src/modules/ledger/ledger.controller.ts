@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LedgerService } from './ledger.service';
 
@@ -10,5 +10,16 @@ export class LedgerController {
   @Get()
   list(@Request() req: any, @Query('month') month?: string) {
     return this.svc.list(req.user.userId, month);
+  }
+
+  @Post()
+  create(@Request() req: any, @Body() body: {
+    description: string;
+    amount: number;
+    direction: 'DEBIT' | 'CREDIT';
+    categoryName?: string;
+    txDate?: string;
+  }) {
+    return this.svc.create(req.user.userId, body);
   }
 }
