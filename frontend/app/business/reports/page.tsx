@@ -1,26 +1,34 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-const MONTHS = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setMonth(d.getMonth()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+const MONTHS = Array.from({ length: 6 }, (_, i) => {
+  const d = new Date(); d.setMonth(d.getMonth() - i);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+});
 
 export default function BusinessReportsPage() {
+  const { apiFetch } = useAuth();
   const [month, setMonth] = useState(MONTHS[0]);
   const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    const t = localStorage.getItem('mp_token');
-    fetch(`${API}/business-invoices/summary?month=${month}`, { headers: { Authorization: `Bearer ${t}` } })
-      .then(r => r.json()).then(d => setSummary(d.data)).catch(() => {});
+    setLoading(true);
+    apiFetch(`/business-invoices/summary?month=${month}`)
+      .then(r => r.json()).then(d => setSummary(d.data))
+      .catch(() => {}).finally(() => setLoading(false));
   }, [month]);
 
   async function downloadPdf() {
     setDownloading(true);
     const t = localStorage.getItem('mp_token');
     try {
-      const res = await fetch(`${API}/business-invoices/report/pdf?month=${month}`, { headers: { Authorization: `Bearer ${t}` } });
-      if (!res.ok) throw new Error('下載失敗');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/business-invoices/report/pdf?month=${month}`, {
+        headers: { Authorization: `Bearer ${t}` },
+      });
+      if (!res.ok) throw new Error('下載失敗，請稍後再試');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -31,82 +39,110 @@ export default function BusinessReportsPage() {
   }
 
   const fmt = (n: number) => `NT$ ${Math.abs(n ?? 0).toLocaleString()}`;
+  const netTax = summary?.netTax ?? 0;
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'var(--background)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #6c63ff 100%)', padding: '48px 20px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>📊 發票報表</div>
+    <div style={{ minHeight: '100dvh', background: '#f4f6fb', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(160deg, #1e1b4b 0%, #5b5fc7 100%)', padding: '56px 20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>發票報表</div>
           <button onClick={downloadPdf} disabled={downloading} style={{
-            background: downloading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.25)',
-            border: 'none', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600,
+            background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600,
             padding: '8px 16px', cursor: downloading ? 'not-allowed' : 'pointer',
-          }}>{downloading ? '產製中...' : '⬇ PDF 下載'}</button>
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {downloading ? (
+              <>
+                <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                產製中
+              </>
+            ) : '下載 PDF'}
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {MONTHS.map(m => (
             <button key={m} onClick={() => setMonth(m)} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
-              background: m === month ? '#fff' : 'rgba(255,255,255,0.2)',
-              color: m === month ? '#6c63ff' : '#fff', fontSize: 13, fontWeight: m === month ? 700 : 400,
+              background: m === month ? '#fff' : 'rgba(255,255,255,0.18)',
+              color: m === month ? '#5b5fc7' : '#fff',
+              fontSize: 13, fontWeight: m === month ? 700 : 500,
             }}>{m.slice(5)}月</button>
           ))}
         </div>
       </div>
 
       <div style={{ padding: '16px' }}>
-        {/* Net tax highlight */}
-        <div style={{ background: 'linear-gradient(135deg, #6c63ff, #a29bfe)', borderRadius: 20, padding: '20px', marginBottom: 16, boxShadow: '0 8px 24px rgba(108,99,255,0.3)' }}>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>應納營業稅</div>
-          <div style={{ color: '#fff', fontSize: 36, fontWeight: 800, marginTop: 4 }}>{fmt(summary?.netTax ?? 0)}</div>
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>
-            {(summary?.netTax ?? 0) > 0 ? '需繳稅' : (summary?.netTax ?? 0) < 0 ? '可退稅' : ''}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(91,95,199,0.15)', borderTopColor: '#5b5fc7', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           </div>
-        </div>
-
-        {/* Received */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', marginBottom: 12, boxShadow: '0 2px 16px rgba(108,99,255,0.07)' }}>
-          <div style={{ fontWeight: 700, color: '#26de81', fontSize: 15, marginBottom: 14 }}>📥 進項（收到的發票）</div>
-          {[
-            ['張數', `${summary?.received?.count ?? 0} 張`],
-            ['含稅金額', fmt(summary?.received?.amount ?? 0)],
-            ['未稅金額', fmt(summary?.received?.untaxedAmount ?? 0)],
-            ['進項稅額', fmt(summary?.received?.taxAmount ?? 0)],
-          ].map(([k,v]) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f2f8' }}>
-              <span style={{ fontSize: 13, color: '#8892a4' }}>{k}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{v}</span>
+        ) : (
+          <>
+            {/* Net tax card */}
+            <div style={{
+              background: netTax > 0
+                ? 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)'
+                : netTax < 0
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
+              borderRadius: 20, padding: '24px 20px', marginBottom: 14,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            }}>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 }}>應納營業稅</div>
+              <div style={{ color: '#fff', fontSize: 38, fontWeight: 800, letterSpacing: '-1.5px' }}>{fmt(netTax)}</div>
+              <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 6 }}>
+                {netTax > 0 ? '本期需繳納' : netTax < 0 ? '本期可退稅或留抵' : '本期持平'}
+              </div>
             </div>
-          ))}
-        </div>
 
-        {/* Issued */}
-        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', marginBottom: 12, boxShadow: '0 2px 16px rgba(108,99,255,0.07)' }}>
-          <div style={{ fontWeight: 700, color: '#ff6b6b', fontSize: 15, marginBottom: 14 }}>📤 銷項（開出的發票）</div>
-          {[
-            ['張數', `${summary?.issued?.count ?? 0} 張`],
-            ['含稅金額', fmt(summary?.issued?.amount ?? 0)],
-            ['未稅金額', fmt(summary?.issued?.untaxedAmount ?? 0)],
-            ['銷項稅額', fmt(summary?.issued?.taxAmount ?? 0)],
-            ['剩餘可開張數', `${summary?.remainingQuota ?? 0} 張`],
-          ].map(([k,v]) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f2f8' }}>
-              <span style={{ fontSize: 13, color: '#8892a4' }}>{k}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{v}</span>
+            {/* Received */}
+            <div style={{ background: '#fff', borderRadius: 20, padding: '20px', marginBottom: 12, boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
+              <div style={{ fontWeight: 700, color: '#10b981', fontSize: 15, marginBottom: 14 }}>進項（收到的發票）</div>
+              {[
+                ['張數', `${summary?.received?.count ?? 0} 張`],
+                ['含稅金額', fmt(summary?.received?.amount ?? 0)],
+                ['未稅金額', fmt(summary?.received?.untaxedAmount ?? 0)],
+                ['進項稅額', fmt(summary?.received?.taxAmount ?? 0)],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>{k}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>{v}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Tax calc explanation */}
-        <div style={{ background: '#fafbff', border: '1px solid #e8ecf4', borderRadius: 16, padding: '14px', marginBottom: 24 }}>
-          <div style={{ fontSize: 12, color: '#6c63ff', fontWeight: 700, marginBottom: 6 }}>📌 營業稅計算說明</div>
-          <div style={{ fontSize: 12, color: '#8892a4', lineHeight: 1.7 }}>
-            應納稅額 = 銷項稅額 − 進項稅額<br />
-            正值：需向稅局申報繳納<br />
-            負值：可申請留抵或退稅<br />
-            一般稅率：5%（含稅金額 × 5/105）
-          </div>
-        </div>
+            {/* Issued */}
+            <div style={{ background: '#fff', borderRadius: 20, padding: '20px', marginBottom: 12, boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
+              <div style={{ fontWeight: 700, color: '#f43f5e', fontSize: 15, marginBottom: 14 }}>銷項（開出的發票）</div>
+              {[
+                ['張數', `${summary?.issued?.count ?? 0} 張`],
+                ['含稅金額', fmt(summary?.issued?.amount ?? 0)],
+                ['未稅金額', fmt(summary?.issued?.untaxedAmount ?? 0)],
+                ['銷項稅額', fmt(summary?.issued?.taxAmount ?? 0)],
+                ['剩餘可開張數', `${summary?.remainingQuota ?? 0} 張`],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>{k}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Formula note */}
+            <div style={{ background: '#eff2ff', borderRadius: 16, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: '#5b5fc7', fontWeight: 700, marginBottom: 6 }}>計算說明</div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.8 }}>
+                應納稅額 = 銷項稅額 − 進項稅額<br />
+                正值需繳納；負值可留抵或申請退稅<br />
+                稅率 5%（含稅金額 × 5 ÷ 105）
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

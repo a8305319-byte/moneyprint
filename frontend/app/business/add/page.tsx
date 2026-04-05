@@ -1,8 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+import { useAuth } from '../../context/AuthContext';
 
 const FORMATS = [
   { value: 'ELECTRONIC', label: '電子發票' },
@@ -12,7 +11,10 @@ const FORMATS = [
   { value: 'RECEIPT', label: '一般收據' },
 ];
 
+const inp = (label: string, placeholder = '', required = false) => ({ label, placeholder, required });
+
 export default function AddInvoicePage() {
+  const { apiFetch } = useAuth();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,18 +35,16 @@ export default function AddInvoicePage() {
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  // Tax preview
   const amt = Number(form.amount) || 0;
   const taxAmt = form.taxType === 'TAXABLE' ? Math.round(amt * 5 / 105 * 100) / 100 : 0;
   const untaxed = amt - taxAmt;
 
-  // Camera scan
   async function startCamera() {
     setScanning(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-    } catch { setError('無法存取相機'); setScanning(false); }
+    } catch { setError('無法存取相機，請手動填寫'); setScanning(false); }
   }
 
   function captureFrame() {
@@ -52,30 +52,22 @@ export default function AddInvoicePage() {
     if (!video || !canvas) return;
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     canvas.getContext('2d')?.drawImage(video, 0, 0);
-    // Stop camera
     const stream = video.srcObject as MediaStream;
     stream?.getTracks().forEach(t => t.stop());
     video.srcObject = null;
     setScanning(false);
-    // Parse invoice number from image (basic OCR simulation)
-    // In production, send canvas.toDataURL() to a vision API
-    parseInvoiceFromCanvas(canvas);
-  }
-
-  function parseInvoiceFromCanvas(canvas: HTMLCanvasElement) {
-    // Placeholder: in production integrate Google Vision or Tesseract.js
-    // For now just show guidance message
-    setError('📸 圖片已擷取！請手動確認並補填發票資料');
+    setError('圖片已擷取，請手動確認並補填發票資料');
   }
 
   async function save() {
-    if (!form.invoiceNo || !form.counterpartyName || !form.amount) { setError('請填寫必填欄位'); return; }
+    if (!form.invoiceNo || !form.counterpartyName || !form.amount) {
+      setError('請填寫發票號碼、交易對象及金額');
+      return;
+    }
     setSaving(true); setError('');
-    const t = localStorage.getItem('mp_token');
     try {
-      const res = await fetch(`${API}/business-invoices`, {
+      const res = await apiFetch('/business-invoices', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
         body: JSON.stringify({ ...form, amount: Number(form.amount) }),
       });
       const json = await res.json();
@@ -85,74 +77,100 @@ export default function AddInvoicePage() {
     finally { setSaving(false); }
   }
 
-  const inp = (label: string, key: string, type = 'text', placeholder = '') => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12, color: '#8892a4', marginBottom: 5 }}>{label}</div>
-      <input type={type} value={(form as any)[key]} onChange={set(key)} placeholder={placeholder}
-        style={{ width: '100%', border: '1.5px solid #e8ecf4', borderRadius: 12, padding: '11px 14px', fontSize: 14, outline: 'none', color: '#1a1a2e', background: '#fafbff' }} />
-    </div>
-  );
+  const inputStyle = {
+    width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 12,
+    padding: '12px 14px', fontSize: 14, outline: 'none', color: '#1e1b4b',
+    background: '#f8fafc', boxSizing: 'border-box' as const,
+  };
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'var(--background)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #6c63ff 0%, #48cfad 100%)', padding: '48px 20px 24px' }}>
-        <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>➕ 新增發票</div>
+    <div style={{ minHeight: '100dvh', background: '#f4f6fb', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(160deg, #5b5fc7 0%, #7c3aed 100%)', padding: '56px 20px 24px' }}>
+        <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 12, color: '#fff', fontSize: 13, padding: '6px 14px', cursor: 'pointer', marginBottom: 12 }}>← 返回</button>
+        <div style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>新增發票</div>
       </div>
 
       <div style={{ padding: '16px' }}>
-        {/* Camera scan */}
+        {/* Camera */}
         {!scanning ? (
           <button onClick={startCamera} style={{
-            width: '100%', background: '#fff', border: '2px dashed #6c63ff', borderRadius: 20,
-            padding: '20px', marginBottom: 16, cursor: 'pointer', color: '#6c63ff', fontWeight: 700, fontSize: 14,
-          }}>📷 相機掃描發票</button>
+            width: '100%', background: '#fff', border: '2px dashed #5b5fc7',
+            borderRadius: 18, padding: '18px', marginBottom: 14,
+            cursor: 'pointer', color: '#5b5fc7', fontWeight: 600, fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>📷 掃描發票</button>
         ) : (
-          <div style={{ position: 'relative', marginBottom: 16 }}>
-            <video ref={videoRef} style={{ width: '100%', borderRadius: 20 }} />
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <video ref={videoRef} style={{ width: '100%', borderRadius: 18 }} autoPlay />
             <canvas ref={canvasRef} style={{ display: 'none' }} />
             <button onClick={captureFrame} style={{
               position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-              background: '#fff', border: 'none', borderRadius: '50%', width: 60, height: 60,
-              fontSize: 28, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+              background: '#fff', border: 'none', borderRadius: '50%',
+              width: 60, height: 60, fontSize: 28, cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
             }}>📸</button>
           </div>
         )}
 
-        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 16px rgba(108,99,255,0.08)', marginBottom: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
           {/* Direction */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: '#8892a4', marginBottom: 5 }}>發票類型</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>發票類型</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {[['RECEIVED','📥 進項（收到）'],['ISSUED','📤 銷項（開出）']].map(([v,l]) => (
-                <button key={v} onClick={() => setForm(f=>({...f, direction: v as any}))} style={{
-                  padding: '11px', borderRadius: 12, border: '2px solid', cursor: 'pointer',
-                  borderColor: form.direction === v ? '#6c63ff' : '#e8ecf4',
-                  background: form.direction === v ? '#f0f0ff' : '#fafbff',
-                  color: form.direction === v ? '#6c63ff' : '#8892a4',
-                  fontWeight: form.direction === v ? 700 : 400, fontSize: 13,
-                }}>{l}</button>
+              {(['RECEIVED', 'ISSUED'] as const).map((v) => (
+                <button key={v} onClick={() => setForm(f => ({ ...f, direction: v }))} style={{
+                  padding: '12px', borderRadius: 12, border: '2px solid', cursor: 'pointer',
+                  borderColor: form.direction === v ? '#5b5fc7' : '#e2e8f0',
+                  background: form.direction === v ? '#eff2ff' : '#f8fafc',
+                  color: form.direction === v ? '#5b5fc7' : '#64748b',
+                  fontWeight: form.direction === v ? 700 : 500, fontSize: 13,
+                  transition: 'all 0.2s',
+                }}>
+                  {v === 'RECEIVED' ? '進項（收到）' : '銷項（開出）'}
+                </button>
               ))}
             </div>
           </div>
 
           {/* Format */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: '#8892a4', marginBottom: 5 }}>發票格式</div>
-            <select value={form.format} onChange={set('format')} style={{ width: '100%', border: '1.5px solid #e8ecf4', borderRadius: 12, padding: '11px 14px', fontSize: 14, outline: 'none', background: '#fafbff', color: '#1a1a2e' }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>發票格式</div>
+            <select value={form.format} onChange={set('format')} style={{ ...inputStyle, appearance: 'none' }}>
               {FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
             </select>
           </div>
 
-          {inp('發票號碼 *', 'invoiceNo', 'text', 'AB-12345678')}
-          {inp('發票日期 *', 'invoiceDate', 'date')}
-          {inp('交易對象（公司/商家名稱）*', 'counterpartyName', 'text', '統一超商股份有限公司')}
-          {inp('對方統一編號（選填）', 'counterpartyTaxId', 'text', '12345678')}
-          {inp('含稅金額 *', 'amount', 'number', '0')}
+          {/* Fields */}
+          {[
+            { label: '發票號碼', key: 'invoiceNo', placeholder: 'AB-12345678', required: true },
+            { label: '發票日期', key: 'invoiceDate', type: 'date', required: true },
+            { label: '交易對象', key: 'counterpartyName', placeholder: '統一超商股份有限公司', required: true },
+            { label: '對方統一編號（選填）', key: 'counterpartyTaxId', placeholder: '12345678' },
+            { label: '含稅金額', key: 'amount', type: 'number', placeholder: '0', required: true },
+          ].map(f => (
+            <div key={f.key} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>
+                {f.label}{(f as any).required && <span style={{ color: '#f43f5e', marginLeft: 2 }}>*</span>}
+              </div>
+              <input
+                type={(f as any).type ?? 'text'}
+                value={(form as any)[f.key]}
+                onChange={set(f.key)}
+                placeholder={f.placeholder}
+                style={inputStyle}
+                onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
+                onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+              />
+            </div>
+          ))}
 
           {/* Tax type */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: '#8892a4', marginBottom: 5 }}>稅別</div>
-            <select value={form.taxType} onChange={set('taxType')} style={{ width: '100%', border: '1.5px solid #e8ecf4', borderRadius: 12, padding: '11px 14px', fontSize: 14, outline: 'none', background: '#fafbff', color: '#1a1a2e' }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>稅別</div>
+            <select value={form.taxType} onChange={set('taxType')} style={{ ...inputStyle, appearance: 'none' }}>
               <option value="TAXABLE">應稅（5%）</option>
               <option value="ZERO_RATE">零稅率</option>
               <option value="EXEMPT">免稅</option>
@@ -161,30 +179,50 @@ export default function AddInvoicePage() {
 
           {/* Tax preview */}
           {amt > 0 && (
-            <div style={{ background: '#f5f6fa', borderRadius: 12, padding: '12px', marginBottom: 14, fontSize: 13 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#8892a4' }}>未稅金額</span>
-                <span style={{ fontWeight: 600 }}>NT$ {untaxed.toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#8892a4' }}>稅額 (5%)</span>
-                <span style={{ fontWeight: 600, color: '#6c63ff' }}>NT$ {taxAmt.toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700 }}>含稅金額</span>
-                <span style={{ fontWeight: 800, color: '#1a1a2e' }}>NT$ {amt.toLocaleString()}</span>
-              </div>
+            <div style={{ background: '#f8fafc', borderRadius: 12, padding: '14px', marginBottom: 16, fontSize: 13 }}>
+              {[
+                { label: '未稅金額', value: `NT$ ${untaxed.toLocaleString()}`, color: '#1e1b4b' },
+                { label: '稅額 (5%)', value: `NT$ ${taxAmt.toLocaleString()}`, color: '#5b5fc7' },
+                { label: '含稅金額', value: `NT$ ${amt.toLocaleString()}`, color: '#1e1b4b', bold: true },
+              ].map(r => (
+                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ color: '#94a3b8' }}>{r.label}</span>
+                  <span style={{ fontWeight: (r as any).bold ? 800 : 600, color: r.color }}>{r.value}</span>
+                </div>
+              ))}
             </div>
           )}
 
-          {inp('備註（選填）', 'description', 'text', '說明...')}
-          {error && <div style={{ color: '#ff6b6b', fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{error}</div>}
+          {/* Description */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>備註（選填）</div>
+            <input
+              value={form.description} onChange={set('description')}
+              placeholder="說明..."
+              style={inputStyle}
+              onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
+              onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+            />
+          </div>
+
+          {error && (
+            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 10, padding: '10px 14px', color: '#e11d48', fontSize: 13, marginBottom: 14 }}>{error}</div>
+          )}
 
           <button onClick={save} disabled={saving} style={{
-            width: '100%', background: 'linear-gradient(135deg, #6c63ff, #48cfad)',
+            width: '100%',
+            background: 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
             border: 'none', borderRadius: 14, color: '#fff', fontWeight: 700, fontSize: 16,
-            padding: '15px', cursor: saving ? 'not-allowed' : 'pointer',
-          }}>{saving ? '儲存中...' : '✓ 儲存發票'}</button>
+            padding: '16px', cursor: saving ? 'not-allowed' : 'pointer',
+            boxShadow: saving ? 'none' : '0 6px 20px rgba(91,95,199,0.4)',
+          }}>
+            {saving ? (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                儲存中
+              </span>
+            ) : '儲存發票'}
+          </button>
         </div>
       </div>
     </div>
