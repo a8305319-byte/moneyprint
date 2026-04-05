@@ -18,6 +18,7 @@ export default function InvoicesPage() {
   const [carrier, setCarrier] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+  const [syncCount, setSyncCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(MONTHS[0]);
 
@@ -35,10 +36,12 @@ export default function InvoicesPage() {
   async function sync() {
     setSyncing(true); setSyncDone(false);
     try {
+      const prevCount = invoices.length;
       await apiFetch(`/invoices/sync?carrier=${encodeURIComponent(carrier)}`, { method: 'POST' });
       await load();
+      setSyncCount(invoices.length - prevCount);
       setSyncDone(true);
-      setTimeout(() => setSyncDone(false), 3000);
+      setTimeout(() => setSyncDone(false), 3500);
     } finally { setSyncing(false); }
   }
 
@@ -101,8 +104,8 @@ export default function InvoicesPage() {
             </button>
           </div>
           {syncDone && (
-            <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '8px 12px', color: '#059669', fontSize: 12, fontWeight: 600 }}>
-              同步完成
+            <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', color: '#059669', fontSize: 13, fontWeight: 600 }}>
+              ✓ 同步完成{syncCount > 0 ? `，新增 ${syncCount} 張發票` : '，已是最新'}
             </div>
           )}
         </div>

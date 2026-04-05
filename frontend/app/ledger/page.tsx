@@ -41,7 +41,12 @@ export default function LedgerPage() {
 
       {/* Header */}
       <div style={{ background: 'linear-gradient(160deg, #5b5fc7 0%, #7c3aed 100%)', padding: '56px 20px 24px' }}>
-        <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px', marginBottom: 18 }}>帳本</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 }}>
+          <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px' }}>帳本</div>
+          {!loading && txs.length > 0 && (
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 500 }}>共 {txs.length} 筆</div>
+          )}
+        </div>
 
         {/* Month selector */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>

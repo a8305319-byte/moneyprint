@@ -156,10 +156,14 @@ export default function ReportsPage() {
             )}
 
             {!summary && breakdown.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '80px 0' }}>
-                <div style={{ fontSize: 52, marginBottom: 16 }}>📊</div>
-                <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>還沒有資料</div>
-                <div style={{ color: '#94a3b8', fontSize: 13 }}>匯入對帳單後會自動出現</div>
+              <div style={{ textAlign: 'center', padding: '72px 24px' }}>
+                <div style={{
+                  width: 60, height: 60, borderRadius: 20,
+                  background: 'rgba(16,185,129,0.1)', margin: '0 auto 18px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+                }}>📊</div>
+                <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>這個月還沒有資料</div>
+                <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6 }}>匯入對帳單後報表會自動出現</div>
               </div>
             )}
           </>

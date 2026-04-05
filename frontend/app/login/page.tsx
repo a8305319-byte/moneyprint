@@ -51,6 +51,7 @@ export default function LoginPage() {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', padding: '24px 20px',
     }}>
+      <style>{`@keyframes sp { to { transform: rotate(360deg); } }`}</style>
       {/* Logo area */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{
@@ -105,7 +106,12 @@ export default function LoginPage() {
             transition: 'opacity 0.2s',
           }}
         >
-          {loading ? '...' : mode === 'login' ? '進入' : '建立'}
+          {loading ? (
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'sp 0.7s linear infinite' }} />
+              {mode === 'login' ? '登入中' : '建立中'}
+            </span>
+          ) : mode === 'login' ? '進入' : '建立帳號'}
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>

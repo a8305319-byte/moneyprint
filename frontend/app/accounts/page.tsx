@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 
 export default function AccountsPage() {
-  const { user, logout, switchMode, updateProfile } = useAuth();
+  const { user, logout, switchMode, updateProfile, demoMode } = useAuth();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [uploadOk, setUploadOk] = useState(false);
@@ -19,6 +19,10 @@ export default function AccountsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   async function upload() {
+    if (demoMode) {
+      setUploadError('示範模式不支援匯入，請先建立帳號以使用完整功能');
+      return;
+    }
     const file = fileRef.current?.files?.[0];
     if (!file) return;
     setUploading(true); setUploadError(''); setUploadOk(false);
@@ -168,7 +172,7 @@ export default function AccountsPage() {
         {/* Bank upload */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', marginBottom: 4 }}>匯入對帳單</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>從網路銀行匯出 CSV 或 XLSX 後上傳</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>從網路銀行匯出 CSV 或 XLSX，上傳後自動整理</div>
 
           <label style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',

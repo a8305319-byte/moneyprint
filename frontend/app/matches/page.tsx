@@ -15,6 +15,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   async function load() {
     const res = await apiFetch('/matches/pending');
@@ -27,20 +28,31 @@ export default function MatchesPage() {
   }, []);
 
   async function autoMatch() {
-    setRunning(true);
-    await apiFetch('/matches/auto', { method: 'POST' });
-    await load();
-    setRunning(false);
+    setRunning(true); setActionError('');
+    try {
+      await apiFetch('/matches/auto', { method: 'POST' });
+      await load();
+    } catch {
+      setActionError('自動比對失敗，請稍後再試');
+    } finally { setRunning(false); }
   }
 
   async function confirm(id: string) {
-    await apiFetch(`/matches/${id}/confirm`, { method: 'POST' });
-    setMatches(m => m.filter(x => x.id !== id));
+    try {
+      await apiFetch(`/matches/${id}/confirm`, { method: 'POST' });
+      setMatches(m => m.filter(x => x.id !== id));
+    } catch {
+      setActionError('操作失敗，請再試一次');
+    }
   }
 
   async function reject(id: string) {
-    await apiFetch(`/matches/${id}/reject`, { method: 'POST' });
-    setMatches(m => m.filter(x => x.id !== id));
+    try {
+      await apiFetch(`/matches/${id}/reject`, { method: 'POST' });
+      setMatches(m => m.filter(x => x.id !== id));
+    } catch {
+      setActionError('操作失敗，請再試一次');
+    }
   }
 
   return (
@@ -72,15 +84,27 @@ export default function MatchesPage() {
       </div>
 
       <div style={{ padding: '16px 16px 32px' }}>
+        {actionError && (
+          <div style={{
+            background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12,
+            padding: '12px 16px', color: '#e11d48', fontSize: 13, fontWeight: 600,
+            marginBottom: 12,
+          }}>{actionError}</div>
+        )}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(91,95,199,0.15)', borderTopColor: '#5b5fc7', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           </div>
         ) : matches.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 0' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>✓</div>
-            <div style={{ color: '#1e1b4b', fontSize: 18, fontWeight: 800, marginBottom: 8 }}>全部確認完畢</div>
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>點擊「自動比對」開始新一輪</div>
+          <div style={{ textAlign: 'center', padding: '72px 24px' }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 20,
+              background: '#f0fdf4', margin: '0 auto 18px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28,
+            }}>✓</div>
+            <div style={{ color: '#1e1b4b', fontSize: 17, fontWeight: 800, marginBottom: 8 }}>全部處理完畢</div>
+            <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6 }}>點擊「自動比對」<br />開始下一輪配對</div>
           </div>
         ) : matches.map(m => {
           const bankItem = m.items.find(i => i.bankTx);
