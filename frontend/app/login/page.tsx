@@ -24,7 +24,7 @@ export default function LoginPage() {
           companyName: form.companyName || undefined, taxId: form.taxId || undefined,
         });
       }
-      router.replace('/');
+      router.replace('/app');
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }

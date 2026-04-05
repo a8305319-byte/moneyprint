@@ -4,32 +4,34 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import BottomNav from './BottomNav';
 
+const PUBLIC_PATHS = ['/', '/login'];
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const isPublic = pathname === '/login';
+  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isNav = !PUBLIC_PATHS.includes(pathname); // show bottom nav on all protected pages
 
   useEffect(() => {
-    if (!loading && !user && !isPublic) router.replace('/login');
+    if (loading) return;
+    if (!user && !isPublic) router.replace('/login');
   }, [loading, user, isPublic]);
 
   if (loading) {
     return (
       <div style={{
         height: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(160deg, #5b5fc7 0%, #7c3aed 100%)',
+        alignItems: 'center', justifyContent: 'center', background: '#0a0a0f',
       }}>
         <div style={{
-          width: 72, height: 72, borderRadius: 24,
-          background: 'rgba(255,255,255,0.15)',
+          width: 64, height: 64, borderRadius: 22,
+          background: 'rgba(91,95,199,0.2)',
+          border: '1px solid rgba(91,95,199,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 36, marginBottom: 20,
-          backdropFilter: 'blur(8px)',
+          fontSize: 30, marginBottom: 18,
         }}>💰</div>
-        <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px' }}>錢跡</div>
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 6 }}>載入中...</div>
+        <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>錢跡</div>
       </div>
     );
   }
@@ -37,9 +39,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user && !isPublic) return null;
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: isPublic ? 0 : 80 }}>
+    <div style={{ maxWidth: 480, margin: '0 auto', paddingBottom: isNav ? 80 : 0 }}>
       {children}
-      {!isPublic && <BottomNav />}
+      {isNav && <BottomNav />}
     </div>
   );
 }
