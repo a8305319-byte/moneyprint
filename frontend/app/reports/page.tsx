@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#5b5fc7', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#8b5cf6'];
@@ -15,6 +16,7 @@ interface Category { categoryName: string; totalAmount: number; txCount: number;
 
 export default function ReportsPage() {
   const { apiFetch } = useAuth();
+  const router = useRouter();
   const [month, setMonth] = useState(MONTHS[0]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [breakdown, setBreakdown] = useState<Category[]>([]);
@@ -35,6 +37,7 @@ export default function ReportsPage() {
   }, [month]);
 
   const fmt = (n: number) => `NT$ ${Math.abs(n ?? 0).toLocaleString()}`;
+  const hasData = summary && (summary.totalExpense > 0 || summary.totalIncome > 0);
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f4f6fb', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -58,33 +61,69 @@ export default function ReportsPage() {
       <div style={{ padding: '16px 16px 32px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
-            <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(91,95,199,0.15)', borderTopColor: '#5b5fc7', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(16,185,129,0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          </div>
+        ) : !hasData ? (
+          /* ── Empty state ── */
+          <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 22,
+              background: 'rgba(16,185,129,0.1)', margin: '0 auto 20px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30,
+            }}>📊</div>
+            <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>這個月還沒有資料</div>
+            <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6, marginBottom: 28 }}>
+              開始記帳，報表就會自動出現
+            </div>
+            <button
+              onClick={() => router.push('/app')}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none', borderRadius: 16, color: '#fff',
+                fontWeight: 700, fontSize: 15, padding: '14px 32px', cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(16,185,129,0.35)',
+              }}
+            >去記帳</button>
           </div>
         ) : (
           <>
-            {/* Summary cards */}
+            {/* Summary — 2 big + 1 full-width */}
             {summary && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: '支出', value: summary.totalExpense, color: '#f43f5e' },
-                  { label: '收入', value: summary.totalIncome, color: '#10b981' },
-                  { label: '淨額', value: summary.netFlow, color: summary.netFlow >= 0 ? '#10b981' : '#f43f5e' },
-                ].map(c => (
-                  <div key={c.label} style={{
-                    background: '#fff', borderRadius: 16, padding: '16px 12px',
-                    boxShadow: '0 2px 12px rgba(15,23,42,0.06)', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>{c.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: c.color, letterSpacing: '-0.3px' }}>
-                      {c.label === '淨額' && c.value > 0 ? '+' : ''}NT$ {Math.abs(c.value ?? 0).toLocaleString()}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  {[
+                    { label: '支出', value: summary.totalExpense, color: '#f43f5e' },
+                    { label: '收入', value: summary.totalIncome, color: '#10b981' },
+                  ].map(c => (
+                    <div key={c.label} style={{
+                      background: '#fff', borderRadius: 18, padding: '18px 16px',
+                      boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
+                    }}>
+                      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>{c.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: c.color, letterSpacing: '-0.5px' }}>
+                        {fmt(c.value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{
+                  background: '#fff', borderRadius: 18, padding: '18px 16px',
+                  boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>淨額</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.5px', color: (summary.netFlow ?? 0) >= 0 ? '#10b981' : '#f43f5e' }}>
+                      {(summary.netFlow ?? 0) >= 0 ? '+' : ''}{fmt(summary.netFlow ?? 0)}
                     </div>
                   </div>
-                ))}
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{summary.txCount} 筆記錄</div>
+                </div>
               </div>
             )}
 
             {/* 6-month trend */}
-            {trend.length > 0 && (
+            {trend.length > 0 && trend.some(t => t.totalExpense > 0 || t.totalIncome > 0) && (
               <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', marginBottom: 16 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', marginBottom: 18 }}>近 6 個月趨勢</div>
                 <ResponsiveContainer width="100%" height={160}>
@@ -135,7 +174,6 @@ export default function ReportsPage() {
                     ))}
                   </div>
                 </div>
-
                 {breakdown.map((b, i) => (
                   <div key={b.categoryName} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -152,18 +190,6 @@ export default function ReportsPage() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {!summary && breakdown.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '72px 24px' }}>
-                <div style={{
-                  width: 60, height: 60, borderRadius: 20,
-                  background: 'rgba(16,185,129,0.1)', margin: '0 auto 18px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-                }}>📊</div>
-                <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>這個月還沒有資料</div>
-                <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6 }}>匯入對帳單後報表會自動出現</div>
               </div>
             )}
           </>

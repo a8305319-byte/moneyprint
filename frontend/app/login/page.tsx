@@ -7,7 +7,7 @@ export default function LoginPage() {
   const { login, register } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', companyName: '', taxId: '' });
+  const [form, setForm] = useState({ email: '', password: '', name: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,17 +19,16 @@ export default function LoginPage() {
       if (mode === 'login') {
         await login(form.email, form.password);
       } else {
-        await register({
-          email: form.email, password: form.password, name: form.name,
-          companyName: form.companyName || undefined, taxId: form.taxId || undefined,
-        });
+        if (!form.name.trim()) { setError('請填寫名字'); setLoading(false); return; }
+        if (form.password.length < 6) { setError('密碼至少需要 6 個字元'); setLoading(false); return; }
+        await register({ email: form.email, password: form.password, name: form.name.trim() });
       }
       router.replace('/app');
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }
 
-  const s: React.CSSProperties = {
+  const inputStyle: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 14,
     padding: '15px 16px', fontSize: 15, outline: 'none', color: '#1e1b4b',
     background: '#f8fafc', boxSizing: 'border-box', display: 'block',
@@ -39,7 +38,7 @@ export default function LoginPage() {
     <input
       type={type} placeholder={placeholder} value={(form as any)[k]}
       onChange={set(k)} onKeyDown={e => e.key === 'Enter' && submit()}
-      style={s}
+      style={inputStyle}
       onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
       onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
     />
@@ -52,7 +51,7 @@ export default function LoginPage() {
       alignItems: 'center', justifyContent: 'center', padding: '24px 20px',
     }}>
       <style>{`@keyframes sp { to { transform: rotate(360deg); } }`}</style>
-      {/* Logo area */}
+
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{
           width: 64, height: 64, borderRadius: 20, margin: '0 auto 14px',
@@ -63,7 +62,6 @@ export default function LoginPage() {
         <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 5 }}>記帳，就這麼簡單</div>
       </div>
 
-      {/* Card */}
       <div style={{
         width: '100%', maxWidth: 380,
         background: '#1e293b', borderRadius: 24,
@@ -78,13 +76,15 @@ export default function LoginPage() {
           <Field placeholder="Email" k="email" type="email" />
           <Field placeholder="密碼" k="password" type="password" />
           {mode === 'register' && (
-            <>
-              <Field placeholder="你叫什麼名字" k="name" />
-              <Field placeholder="公司名稱（選填）" k="companyName" />
-              <Field placeholder="統一編號（選填）" k="taxId" />
-            </>
+            <Field placeholder="你的名字" k="name" />
           )}
         </div>
+
+        {mode === 'register' && (
+          <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+            密碼至少 6 個字元
+          </div>
+        )}
 
         {error && (
           <div style={{

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LedgerService } from './ledger.service';
 
@@ -21,5 +21,10 @@ export class LedgerController {
     txDate?: string;
   }) {
     return this.svc.create(req.user.userId, body);
+  }
+
+  @Delete(':id')
+  remove(@Request() req: any, @Param('id') id: string) {
+    return this.svc.delete(req.user.userId, id);
   }
 }

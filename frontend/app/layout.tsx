@@ -5,9 +5,16 @@ import AppShell from './components/AppShell';
 
 export const metadata: Metadata = {
   title: '錢跡',
-  description: '個人記帳 — 自動比對銀行與發票',
+  description: '記帳，就這麼簡單。不用帳號，立刻開始。',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: '錢跡' },
+  openGraph: {
+    title: '錢跡 — 記帳，就這麼簡單',
+    description: '不用帳號，立刻開始記帳。幾秒完成，天天習慣。',
+    siteName: '錢跡',
+    locale: 'zh_TW',
+    type: 'website',
+  },
 };
 
 export const viewport: Viewport = {

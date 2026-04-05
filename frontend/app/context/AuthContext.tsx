@@ -19,7 +19,7 @@ interface AuthCtx {
   demoMode: boolean;
   apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; name: string; companyName?: string; taxId?: string }) => Promise<void>;
+  register: (data: { email: string; password: string; name: string }) => Promise<void>;
   logout: () => void;
   enterDemo: () => void;
   switchMode: (mode: 'PERSONAL' | 'BUSINESS') => Promise<void>;
@@ -36,34 +36,20 @@ const DEMO_USER: User = {
   mode: 'PERSONAL',
 };
 
-function getDemoTxs() {
-  const base = new Date();
-  const day = (n: number) => {
-    const d = new Date(base); d.setDate(d.getDate() - n);
-    return d.toISOString().slice(0, 10);
-  };
-  return [
-    { id: 'd01', txDate: day(0),  description: '全家便利商店',   amount: '165',   direction: 'DEBIT',  status: 'DONE', category: { name: '餐飲', icon: '🍱' } },
-    { id: 'd02', txDate: day(1),  description: '台北捷運',       amount: '50',    direction: 'DEBIT',  status: 'DONE', category: { name: '交通', icon: '🚇' } },
-    { id: 'd03', txDate: day(2),  description: '薪資轉帳',       amount: '55000', direction: 'CREDIT', status: 'DONE', category: { name: '薪資', icon: '💰' } },
-    { id: 'd04', txDate: day(3),  description: 'Netflix',        amount: '330',   direction: 'DEBIT',  status: 'DONE', category: { name: '娛樂', icon: '🎬' } },
-    { id: 'd05', txDate: day(4),  description: '誠品書店',       amount: '580',   direction: 'DEBIT',  status: 'DONE', category: { name: '購物', icon: '📚' } },
-    { id: 'd06', txDate: day(5),  description: '麥當勞',         amount: '198',   direction: 'DEBIT',  status: 'DONE', category: { name: '餐飲', icon: '🍟' } },
-    { id: 'd07', txDate: day(6),  description: '台灣大哥大',     amount: '699',   direction: 'DEBIT',  status: 'DONE', category: { name: '通訊', icon: '📱' } },
-    { id: 'd08', txDate: day(7),  description: 'UNIQLO',         amount: '1490',  direction: 'DEBIT',  status: 'DONE', category: { name: '購物', icon: '👔' } },
-    { id: 'd09', txDate: day(8),  description: '7-ELEVEN',       amount: '89',    direction: 'DEBIT',  status: 'DONE', category: { name: '餐飲', icon: '🏪' } },
-    { id: 'd10', txDate: day(9),  description: '悠遊卡加值',     amount: '500',   direction: 'DEBIT',  status: 'DONE', category: { name: '交通', icon: '🚌' } },
-  ];
-}
+// Demo state: starts empty. Friends record their own real transactions.
+// All data is in-memory and resets on page refresh — by design.
+const demoState = {
+  txCount: 0,
+  totalExpense: 0,
+  totalIncome: 0,
+  todayTxCount: 0,
+  todayTotalExpense: 0,
+  txs: [] as any[],
+};
 
-function getDemoTrend() {
-  const expenses = [24800, 31200, 19800, 26500, 28440, 22100];
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (5 - i));
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    return { month, totalExpense: expenses[i], totalIncome: 55000, netFlow: 55000 - expenses[i] };
-  });
-}
+const CATEGORY_ICONS: Record<string, string> = {
+  餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
+};
 
 function mockRes(data: any): Response {
   return new Response(JSON.stringify({ data }), {
@@ -72,39 +58,64 @@ function mockRes(data: any): Response {
   });
 }
 
-// Demo session state (in-memory, resets on refresh — intentional)
-const demoState = { txCount: 8, totalExpense: 28440, todayTxCount: 1, todayTotalExpense: 165 };
-
-const CATEGORY_ICONS: Record<string, string> = {
-  餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
-};
-
 function mockApiFetch(url: string, opts: RequestInit = {}): Response {
   const method = (opts.method ?? 'GET').toUpperCase();
   const path = url.split('?')[0];
 
-  // POST /ledger — manual entry in demo
+  // DELETE /ledger/:id
+  if (method === 'DELETE' && /\/ledger\//.test(path)) {
+    const id = path.split('/ledger/')[1];
+    const tx = demoState.txs.find(t => t.id === id);
+    if (tx) {
+      demoState.txs = demoState.txs.filter(t => t.id !== id);
+      demoState.txCount = Math.max(0, demoState.txCount - 1);
+      if (tx.direction === 'DEBIT') {
+        demoState.totalExpense = Math.max(0, demoState.totalExpense - Number(tx.amount));
+        const today = new Date().toISOString().slice(0, 10);
+        if (String(tx.txDate).slice(0, 10) === today) {
+          demoState.todayTotalExpense = Math.max(0, demoState.todayTotalExpense - Number(tx.amount));
+          demoState.todayTxCount = Math.max(0, demoState.todayTxCount - 1);
+        }
+      } else {
+        demoState.totalIncome = Math.max(0, demoState.totalIncome - Number(tx.amount));
+      }
+    }
+    return mockRes({ success: true });
+  }
+
+  // POST /ledger — manual entry
   if (method === 'POST' && path.endsWith('/ledger')) {
     const body = opts.body ? JSON.parse(opts.body as string) : {};
-    const amount = Number(body.amount) || 198;
+    const amount = Number(body.amount) || 0;
     const direction = body.direction ?? 'DEBIT';
-    const now = new Date().toISOString();
-    const month = now.slice(0, 7);
+    const today = new Date().toISOString().slice(0, 10);
+    const txDate = body.txDate ?? today;
+    const isToday = txDate === today;
+    const month = new Date().toISOString().slice(0, 7);
+
     if (direction === 'DEBIT') {
       demoState.totalExpense += amount;
-      demoState.todayTotalExpense += amount;
+      if (isToday) demoState.todayTotalExpense += amount;
+    } else {
+      demoState.totalIncome += amount;
     }
     demoState.txCount += 1;
-    demoState.todayTxCount += 1;
+    if (isToday) demoState.todayTxCount += 1;
+
+    const newTx = {
+      id: `d-${Date.now()}`,
+      txDate: txDate + 'T00:00:00.000Z',
+      description: body.description ?? '記帳',
+      amount: String(amount), direction,
+      status: 'DONE',
+      category: body.categoryName
+        ? { name: body.categoryName, icon: CATEGORY_ICONS[body.categoryName] ?? '📋' }
+        : null,
+    };
+    demoState.txs.unshift(newTx);
+
     return mockRes({
-      transaction: {
-        id: `d-${Date.now()}`, txDate: now,
-        description: body.description ?? '記帳',
-        amount: String(amount), direction,
-        category: body.categoryName
-          ? { name: body.categoryName, icon: CATEGORY_ICONS[body.categoryName] ?? '📋' }
-          : null,
-      },
+      transaction: newTx,
       todaySummary: {
         totalExpense: demoState.todayTotalExpense,
         txCount: demoState.todayTxCount,
@@ -120,20 +131,68 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
   // All other writes
   if (method !== 'GET') return mockRes({ success: true });
 
-  if (path.endsWith('/reports/monthly-summary'))  return mockRes({ totalExpense: demoState.totalExpense, totalIncome: 55000, netFlow: 55000 - demoState.totalExpense, txCount: demoState.txCount });
-  if (path.endsWith('/reports/category-breakdown')) return mockRes([
-    { categoryName: '餐飲', totalAmount: 8240, txCount: 18, percentage: 29.0 },
-    { categoryName: '購物', totalAmount: 6890, txCount: 7,  percentage: 24.2 },
-    { categoryName: '交通', totalAmount: 4520, txCount: 8,  percentage: 15.9 },
-    { categoryName: '娛樂', totalAmount: 3180, txCount: 5,  percentage: 11.2 },
-    { categoryName: '通訊', totalAmount: 5610, txCount: 9,  percentage: 19.7 },
-  ]);
-  if (path.endsWith('/reports/monthly-trend'))    return mockRes(getDemoTrend());
-  if (path.endsWith('/ledger'))                   return mockRes(getDemoTxs());
-  if (path.endsWith('/matches/pending'))          return mockRes([]);
-  if (path.endsWith('/invoices'))                 return mockRes([]);
+  // GET endpoints
+  if (path.endsWith('/reports/monthly-summary')) {
+    return mockRes({
+      totalExpense: demoState.totalExpense,
+      totalIncome: demoState.totalIncome,
+      netFlow: demoState.totalIncome - demoState.totalExpense,
+      txCount: demoState.txCount,
+    });
+  }
+
+  if (path.endsWith('/reports/category-breakdown')) {
+    // Build from actual demo transactions
+    const breakdown: Record<string, { totalAmount: number; txCount: number }> = {};
+    const debitTxs = demoState.txs.filter(t => t.direction === 'DEBIT');
+    const total = debitTxs.reduce((s, t) => s + Number(t.amount), 0);
+    for (const tx of debitTxs) {
+      const name = tx.category?.name ?? '其他';
+      if (!breakdown[name]) breakdown[name] = { totalAmount: 0, txCount: 0 };
+      breakdown[name].totalAmount += Number(tx.amount);
+      breakdown[name].txCount += 1;
+    }
+    return mockRes(
+      Object.entries(breakdown)
+        .map(([categoryName, v]) => ({
+          categoryName, ...v,
+          percentage: total > 0 ? Number(((v.totalAmount / total) * 100).toFixed(1)) : 0,
+        }))
+        .sort((a, b) => b.totalAmount - a.totalAmount)
+    );
+  }
+
+  if (path.endsWith('/reports/monthly-trend')) {
+    // Show only current month with real data; historical months show 0
+    return mockRes(
+      Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (5 - i));
+        const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const isCurrent = i === 5;
+        return {
+          month,
+          totalExpense: isCurrent ? demoState.totalExpense : 0,
+          totalIncome: isCurrent ? demoState.totalIncome : 0,
+          netFlow: isCurrent ? demoState.totalIncome - demoState.totalExpense : 0,
+        };
+      })
+    );
+  }
+
+  if (path.endsWith('/ledger')) {
+    // Filter by month query param
+    const qs = url.includes('?') ? url.split('?')[1] : '';
+    const monthParam = new URLSearchParams(qs).get('month');
+    const txs = monthParam
+      ? demoState.txs.filter(t => String(t.txDate).slice(0, 7) === monthParam)
+      : demoState.txs;
+    return mockRes(txs);
+  }
+
+  if (path.endsWith('/matches/pending'))           return mockRes([]);
+  if (path.endsWith('/invoices'))                  return mockRes([]);
   if (path.endsWith('/business-invoices/summary')) return mockRes(null);
-  if (path.endsWith('/business-invoices'))        return mockRes([]);
+  if (path.endsWith('/business-invoices'))         return mockRes([]);
   return mockRes(null);
 }
 
@@ -215,7 +274,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message ?? '登入失敗');
-    // Clear demo on real login
     localStorage.removeItem('mp_demo');
     demoRef.current = false;
     setDemoMode(false);
@@ -224,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(json.data.user);
   };
 
-  const register = async (data: { email: string; password: string; name: string; companyName?: string; taxId?: string }) => {
+  const register = async (data: { email: string; password: string; name: string }) => {
     const res = await fetch(`${API}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -232,7 +290,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.message ?? '註冊失敗');
-    // Clear demo on real register
     localStorage.removeItem('mp_demo');
     demoRef.current = false;
     setDemoMode(false);

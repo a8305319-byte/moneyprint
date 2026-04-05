@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 function parseMonth(month?: string): { gte: Date; lt: Date } | undefined {
@@ -97,5 +97,13 @@ export class LedgerService {
         monthSummary:  { totalExpense: monthExpense, txCount: monthTxs.length },
       },
     };
+  }
+
+  async delete(userId: string, id: string) {
+    const tx = await this.prisma.ledgerTransaction.findUnique({ where: { id } });
+    if (!tx) throw new NotFoundException('找不到此記錄');
+    if (tx.userId !== userId) throw new ForbiddenException('無權刪除此記錄');
+    await this.prisma.ledgerTransaction.delete({ where: { id } });
+    return { data: { success: true } };
   }
 }

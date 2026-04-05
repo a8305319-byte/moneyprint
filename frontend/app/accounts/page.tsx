@@ -64,7 +64,11 @@ export default function AccountsPage() {
     setSwitchingMode(false);
   }
 
-  function doLogout() { logout(); router.replace('/login'); }
+  function doLogout() {
+    const wasDemo = demoMode;
+    logout();
+    router.replace(wasDemo ? '/' : '/login');
+  }
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f4f6fb', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -72,26 +76,75 @@ export default function AccountsPage() {
 
       {/* Header */}
       <div style={{ background: 'linear-gradient(160deg, #1e1b4b 0%, #5b5fc7 100%)', padding: '56px 20px 28px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{
-              width: 50, height: 50, borderRadius: 16,
-              background: 'rgba(255,255,255,0.12)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, marginBottom: 10,
-            }}>👤</div>
-            <div style={{ color: '#fff', fontSize: 17, fontWeight: 700 }}>{user?.name}</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>{user?.email}</div>
+        {demoMode ? (
+          /* Demo header — no fake email, clear CTA */
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{
+                display: 'inline-block', background: 'rgba(255,255,255,0.12)',
+                borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700,
+                color: 'rgba(255,255,255,0.7)', letterSpacing: '0.6px',
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>示範模式</div>
+              <div style={{ color: '#fff', fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+                資料不會儲存
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 1.5 }}>
+                建立帳號，永久保存所有記錄
+              </div>
+            </div>
+            <button onClick={doLogout} style={{
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 20, color: 'rgba(255,255,255,0.6)', fontSize: 12,
+              padding: '7px 16px', cursor: 'pointer',
+            }}>結束示範</button>
           </div>
-          <button onClick={doLogout} style={{
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: 20, color: 'rgba(255,255,255,0.6)', fontSize: 12,
-            padding: '7px 16px', cursor: 'pointer',
-          }}>登出</button>
-        </div>
+        ) : (
+          /* Real user header */
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{
+                width: 50, height: 50, borderRadius: 16,
+                background: 'rgba(255,255,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, marginBottom: 10,
+              }}>👤</div>
+              <div style={{ color: '#fff', fontSize: 17, fontWeight: 700 }}>{user?.name}</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>{user?.email}</div>
+            </div>
+            <button onClick={doLogout} style={{
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 20, color: 'rgba(255,255,255,0.6)', fontSize: 12,
+              padding: '7px 16px', cursor: 'pointer',
+            }}>登出</button>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: '16px' }}>
+
+        {/* Demo CTA card */}
+        {demoMode && (
+          <div style={{
+            background: 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
+            borderRadius: 20, padding: '20px',
+            boxShadow: '0 8px 28px rgba(91,95,199,0.35)', marginBottom: 14,
+          }}>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, marginBottom: 6 }}>
+              建立帳號，資料永久保存
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+              示範模式的記錄在刷新後會消失。<br />建立免費帳號，所有記錄雲端同步。
+            </div>
+            <Link href="/login" style={{
+              display: 'block', textAlign: 'center',
+              background: '#fff', borderRadius: 14,
+              color: '#5b5fc7', fontSize: 15, fontWeight: 800,
+              padding: '14px', textDecoration: 'none',
+            }}>免費建立帳號</Link>
+          </div>
+        )}
+
         {/* Mode switcher */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', marginBottom: 4 }}>記帳模式</div>
@@ -119,7 +172,7 @@ export default function AccountsPage() {
         </div>
 
         {/* Business settings */}
-        {user?.mode === 'BUSINESS' && (
+        {user?.mode === 'BUSINESS' && !demoMode && (
           <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', marginBottom: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', marginBottom: 16 }}>公司資料</div>
             {[
@@ -155,16 +208,20 @@ export default function AccountsPage() {
         {/* Quick links */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           {[
-            { href: '/invoices', icon: '🧾', label: '電子發票', sub: '同步手機載具' },
-            { href: '/matches', icon: '⇄', label: '交易配對', sub: '帳單 × 發票' },
+            { href: '/invoices', icon: '🧾', label: '電子發票', sub: '同步手機載具', locked: demoMode },
+            { href: '/matches',  icon: '⇄',  label: '交易配對', sub: '帳單 × 發票', locked: demoMode },
           ].map(c => (
             <Link key={c.href} href={c.href} style={{
               background: '#fff', borderRadius: 18, padding: '18px 16px',
-              textDecoration: 'none', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', display: 'block',
+              textDecoration: 'none', boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
+              display: 'block', position: 'relative', overflow: 'hidden',
+              opacity: c.locked ? 0.6 : 1,
             }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>{c.icon}</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>{c.label}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{c.sub}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
+                {c.locked ? '需建立帳號' : c.sub}
+              </div>
             </Link>
           ))}
         </div>
