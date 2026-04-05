@@ -5,14 +5,20 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class MatchingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async autoMatch() {
+  async autoMatch(userId: string) {
     const bankTxs = await this.prisma.bankTransaction.findMany({
-      where: { matchItems: { none: {} } },
+      where: {
+        account: { userId },
+        matchItems: { none: {} },
+      },
       include: { ledger: true },
       take: 200,
     });
     const invoices = await this.prisma.invoiceRecord.findMany({
-      where: { matchItems: { none: {} } },
+      where: {
+        userId,
+        matchItems: { none: {} },
+      },
       take: 200,
     });
 
@@ -29,7 +35,7 @@ export class MatchingService {
       const confidence = this.calcConfidence(tx, best);
       if (confidence < 0.4) continue;
 
-      const match = await this.prisma.transactionMatch.create({
+      await this.prisma.transactionMatch.create({
         data: {
           confidence,
           status: confidence >= 0.8 ? 'CONFIRMED' : 'PENDING',
@@ -64,9 +70,19 @@ export class MatchingService {
     return Math.min(score, 1);
   }
 
-  async listPending() {
+  async listPending(userId: string) {
     return this.prisma.transactionMatch.findMany({
-      where: { status: 'PENDING' },
+      where: {
+        status: 'PENDING',
+        items: {
+          some: {
+            OR: [
+              { bankTx: { account: { userId } } },
+              { invoice: { userId } },
+            ],
+          },
+        },
+      },
       include: {
         items: {
           include: {

@@ -1,15 +1,17 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MatchingService } from './matching.service';
 
 @Controller('matches')
+@UseGuards(JwtAuthGuard)
 export class MatchingController {
   constructor(private readonly svc: MatchingService) {}
 
   @Post('auto')
-  autoMatch() { return this.svc.autoMatch(); }
+  autoMatch(@Request() req: any) { return this.svc.autoMatch(req.user.userId); }
 
   @Get('pending')
-  pending() { return this.svc.listPending(); }
+  pending(@Request() req: any) { return this.svc.listPending(req.user.userId); }
 
   @Post(':id/confirm')
   confirm(@Param('id') id: string) { return this.svc.confirmMatch(id); }

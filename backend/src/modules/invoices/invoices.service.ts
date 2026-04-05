@@ -5,8 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class InvoicesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async enqueueSync(carrier: string) {
-    // Process synchronously (mock data until real API key configured)
+  async enqueueSync(userId: string, carrier: string) {
     const mockInvoices = [
       {
         invoiceNo: `AB${Date.now()}`,
@@ -23,9 +22,10 @@ export class InvoicesService {
     for (const inv of mockInvoices) {
       const exists = await this.prisma.invoiceRecord.findUnique({ where: { invoiceNo: inv.invoiceNo } });
       if (exists) continue;
-      const record = await this.prisma.invoiceRecord.create({ data: inv });
+      const record = await this.prisma.invoiceRecord.create({ data: { ...inv, userId } });
       await this.prisma.ledgerTransaction.create({
         data: {
+          userId,
           source: 'INVOICE',
           status: 'PENDING',
           txDate: inv.invoiceDate,
@@ -40,14 +40,14 @@ export class InvoicesService {
     return { synced: count };
   }
 
-  async list(month?: string) {
-    const where: any = {};
+  async list(userId: string, month?: string) {
+    const where: any = { userId };
     if (month) {
+      if (!/^\d{4}-\d{2}$/.test(month)) {
+        return [];
+      }
       const [y, m] = month.split('-').map(Number);
-      where.invoiceDate = {
-        gte: new Date(y, m - 1, 1),
-        lt: new Date(y, m, 1),
-      };
+      where.invoiceDate = { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
     }
     return this.prisma.invoiceRecord.findMany({
       where,

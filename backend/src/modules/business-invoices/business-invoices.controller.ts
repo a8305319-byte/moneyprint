@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BusinessInvoicesService } from './business-invoices.service';
 import { PdfService } from './pdf.service';
+import { CreateBusinessInvoiceDto } from './dto/create-business-invoice.dto';
 
 @Controller('business-invoices')
 @UseGuards(JwtAuthGuard)
@@ -13,7 +14,7 @@ export class BusinessInvoicesController {
   ) {}
 
   @Post()
-  create(@Request() req: any, @Body() body: any) {
+  create(@Request() req: any, @Body() body: CreateBusinessInvoiceDto) {
     return this.svc.create(req.user.userId, body);
   }
 
@@ -41,6 +42,7 @@ export class BusinessInvoicesController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.OK)
   remove(@Request() req: any, @Param('id') id: string) {
     return this.svc.remove(req.user.userId, id);
   }

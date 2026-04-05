@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class BankImportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async enqueueImport(accountId: string, file: Express.Multer.File) {
+  async enqueueImport(userId: string, accountId: string, file: Express.Multer.File) {
     if (!file) throw new BadRequestException('需要上傳檔案');
     const imp = await this.prisma.bankImport.create({
       data: { accountId, filename: file.originalname, status: 'PROCESSING' },
@@ -39,6 +39,7 @@ export class BankImportsService {
 
         await this.prisma.ledgerTransaction.create({
           data: {
+            userId,
             source: 'BANK_IMPORT',
             status: 'PENDING',
             txDate: new Date(row.txDate),
@@ -69,9 +70,16 @@ export class BankImportsService {
     });
   }
 
-  async list(accountId: string) {
+  async list(userId: string, accountId: string) {
+    const where: any = {};
+    if (accountId) {
+      where.accountId = accountId;
+    } else {
+      // Filter via account.userId
+      where.account = { userId };
+    }
     return this.prisma.bankImport.findMany({
-      where: { accountId },
+      where,
       orderBy: { importedAt: 'desc' },
       take: 20,
     });

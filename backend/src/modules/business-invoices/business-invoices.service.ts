@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateBusinessInvoiceDto } from './dto/create-business-invoice.dto';
 import { Prisma } from '@prisma/client';
 type Decimal = Prisma.Decimal;
 
@@ -7,46 +8,39 @@ type Decimal = Prisma.Decimal;
 export class BusinessInvoicesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: string, body: {
-    direction: 'RECEIVED' | 'ISSUED';
-    format?: string;
-    invoiceNo: string;
-    invoiceDate: string;
-    counterpartyName: string;
-    counterpartyTaxId?: string;
-    amount: number;
-    taxType?: 'TAXABLE' | 'ZERO_RATE' | 'EXEMPT';
-    description?: string;
-    imageUrl?: string;
-  }) {
+  async create(userId: string, body: CreateBusinessInvoiceDto) {
     const amount = Number(body.amount);
     const taxType = body.taxType ?? 'TAXABLE';
     let taxAmount = 0;
     let untaxedAmount = amount;
 
     if (taxType === 'TAXABLE') {
-      // amount is tax-inclusive: tax = amount * 5/105
       taxAmount = Math.round((amount * 5 / 105) * 100) / 100;
       untaxedAmount = Math.round((amount - taxAmount) * 100) / 100;
     }
 
-    return this.prisma.businessInvoice.create({
-      data: {
-        userId,
-        direction: body.direction,
-        format: (body.format as any) ?? 'ELECTRONIC',
-        invoiceNo: body.invoiceNo,
-        invoiceDate: new Date(body.invoiceDate),
-        counterpartyName: body.counterpartyName,
-        counterpartyTaxId: body.counterpartyTaxId,
-        amount,
-        taxAmount,
-        untaxedAmount,
-        taxType: taxType as any,
-        description: body.description,
-        imageUrl: body.imageUrl,
-      },
-    });
+    try {
+      return await this.prisma.businessInvoice.create({
+        data: {
+          userId,
+          direction: body.direction as any,
+          format: (body.format as any) ?? 'ELECTRONIC',
+          invoiceNo: body.invoiceNo,
+          invoiceDate: new Date(body.invoiceDate),
+          counterpartyName: body.counterpartyName,
+          counterpartyTaxId: body.counterpartyTaxId,
+          amount,
+          taxAmount,
+          untaxedAmount,
+          taxType: taxType as any,
+          description: body.description,
+          imageUrl: body.imageUrl,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new ConflictException('此發票號碼已存在，請勿重複建立');
+      throw e;
+    }
   }
 
   async list(userId: string, direction?: string, month?: string) {
@@ -99,6 +93,7 @@ export class BusinessInvoicesService {
   }
 
   async remove(userId: string, id: string) {
-    return this.prisma.businessInvoice.deleteMany({ where: { id, userId } });
+    const result = await this.prisma.businessInvoice.deleteMany({ where: { id, userId } });
+    return result;
   }
 }

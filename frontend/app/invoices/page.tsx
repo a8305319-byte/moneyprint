@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 interface Invoice {
   id: string; invoiceNo: string; invoiceDate: string;
@@ -14,13 +15,14 @@ const MONTHS = Array.from({ length: 3 }, (_, i) => {
 });
 
 export default function InvoicesPage() {
+  const { apiFetch } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [carrier, setCarrier] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [month, setMonth] = useState(MONTHS[0]);
 
   async function load() {
-    const res = await fetch(`${API}/invoices?month=${month}`);
+    const res = await apiFetch(`/invoices?month=${month}`);
     const json = await res.json();
     setInvoices(json.data ?? []);
   }
@@ -29,8 +31,12 @@ export default function InvoicesPage() {
 
   async function sync() {
     setSyncing(true);
-    await fetch(`${API}/invoices/sync?carrier=${encodeURIComponent(carrier)}`, { method: 'POST' });
-    setTimeout(() => { load(); setSyncing(false); }, 2000);
+    try {
+      await apiFetch(`/invoices/sync?carrier=${encodeURIComponent(carrier)}`, { method: 'POST' });
+      await load();
+    } finally {
+      setSyncing(false);
+    }
   }
 
   const total = invoices.reduce((s, i) => s + Number(i.amount), 0);

@@ -1,29 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+
+function parseMonth(month: string): { gte: Date; lt: Date } {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new BadRequestException('月份格式必須為 YYYY-MM');
+  const [y, m] = month.split('-').map(Number);
+  if (m < 1 || m > 12) throw new BadRequestException('月份必須介於 01-12');
+  return { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
+}
 
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private monthRange(month: string) {
-    const [y, m] = month.split('-').map(Number);
-    return { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
-  }
-
-  async getMonthlySummary(month: string) {
-    const range = this.monthRange(month);
+  async getMonthlySummary(userId: string, month: string) {
+    const range = parseMonth(month);
     const txs = await this.prisma.ledgerTransaction.findMany({
-      where: { txDate: range },
+      where: { userId, txDate: range },
     });
     const totalExpense = txs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
     const totalIncome = txs.filter(t => t.direction === 'CREDIT').reduce((s, t) => s + Number(t.amount), 0);
     return { month, totalExpense, totalIncome, netFlow: totalIncome - totalExpense, txCount: txs.length };
   }
 
-  async getCategoryBreakdown(month: string) {
-    const range = this.monthRange(month);
+  async getCategoryBreakdown(userId: string, month: string) {
+    const range = parseMonth(month);
     const txs = await this.prisma.ledgerTransaction.findMany({
-      where: { txDate: range, direction: 'DEBIT', categoryId: { not: null } },
+      where: { userId, txDate: range, direction: 'DEBIT', categoryId: { not: null } },
       include: { category: true },
     });
     const total = txs.reduce((s, t) => s + Number(t.amount), 0);
@@ -40,13 +42,13 @@ export class ReportsService {
       .sort((a, b) => b.amount - a.amount);
   }
 
-  async getMonthlyTrend(months: number) {
+  async getMonthlyTrend(userId: string, months: number) {
     const results: { month: string; totalExpense: number; totalIncome: number; netFlow: number; txCount: number }[] = [];
     for (let i = 0; i < months; i++) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
       const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      results.push(await this.getMonthlySummary(month));
+      results.push(await this.getMonthlySummary(userId, month));
     }
     return results;
   }

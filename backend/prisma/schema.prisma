@@ -70,19 +70,21 @@ enum AppMode {
 
 // ── Auth User ──────────────────────────────────────────
 model AppUser {
-  id               String            @id @default(cuid())
-  email            String            @unique
+  id               String              @id @default(cuid())
+  email            String              @unique
   password         String
   name             String
   companyName      String?
   taxId            String?
   phone            String?
-  mode             AppMode           @default(PERSONAL)
-  invoiceQuota     Int               @default(0)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  mode             AppMode             @default(PERSONAL)
+  invoiceQuota     Int                 @default(0)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   businessInvoices BusinessInvoice[]
   categories       Category[]
+  invoiceRecords   InvoiceRecord[]
+  ledgerTransactions LedgerTransaction[]
 
   @@index([email])
 }
@@ -136,6 +138,8 @@ model BankTransaction {
 
 model InvoiceRecord {
   id          String    @id @default(cuid())
+  userId      String?
+  user        AppUser?  @relation(fields: [userId], references: [id])
   invoiceNo   String    @unique
   invoiceDate DateTime
   sellerName  String
@@ -149,6 +153,7 @@ model InvoiceRecord {
   matchItems  TransactionMatchItem[]
 
   @@index([invoiceDate])
+  @@index([userId])
 }
 
 model Category {
@@ -167,6 +172,8 @@ model Category {
 
 model LedgerTransaction {
   id          String               @id @default(cuid())
+  userId      String?
+  user        AppUser?             @relation(fields: [userId], references: [id])
   source      LedgerSource
   status      LedgerStatus         @default(PENDING)
   txDate      DateTime
@@ -183,6 +190,7 @@ model LedgerTransaction {
 
   @@index([txDate])
   @@index([categoryId])
+  @@index([userId])
 }
 
 model TransactionMatch {
