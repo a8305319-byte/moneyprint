@@ -42,9 +42,7 @@ export class LedgerService {
     let categoryId: string | undefined;
     if (categoryName && categoryName.trim()) {
       const name = categoryName.trim();
-      const existing = await this.prisma.category.findFirst({
-        where: { userId, name },
-      });
+      const existing = await this.prisma.category.findFirst({ where: { userId, name } });
       if (existing) {
         categoryId = existing.id;
       } else {
@@ -75,21 +73,28 @@ export class LedgerService {
       include: { category: true },
     });
 
-    // Return transaction + current month summary
-    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const range = parseMonth(monthStr)!;
+    // Month summary
+    const monthRange = parseMonth(
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    )!;
     const monthTxs = await this.prisma.ledgerTransaction.findMany({
-      where: { userId, txDate: range },
+      where: { userId, txDate: monthRange },
     });
-    const totalExpense = monthTxs
-      .filter(t => t.direction === 'DEBIT')
-      .reduce((s, t) => s + Number(t.amount), 0);
-    const txCount = monthTxs.length;
+    const monthExpense = monthTxs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
+
+    // Today summary
+    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayEnd   = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    const todayTxs = await this.prisma.ledgerTransaction.findMany({
+      where: { userId, txDate: { gte: todayStart, lt: todayEnd } },
+    });
+    const todayExpense = todayTxs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
 
     return {
       data: {
         transaction: tx,
-        monthSummary: { totalExpense, txCount, month: monthStr },
+        todaySummary:  { totalExpense: todayExpense, txCount: todayTxs.length },
+        monthSummary:  { totalExpense: monthExpense, txCount: monthTxs.length },
       },
     };
   }

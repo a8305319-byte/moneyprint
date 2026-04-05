@@ -73,7 +73,7 @@ function mockRes(data: any): Response {
 }
 
 // Demo session state (in-memory, resets on refresh — intentional)
-const demoState = { txCount: 8, totalExpense: 28440 };
+const demoState = { txCount: 8, totalExpense: 28440, todayTxCount: 1, todayTotalExpense: 165 };
 
 const CATEGORY_ICONS: Record<string, string> = {
   餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
@@ -92,8 +92,10 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
     const month = now.slice(0, 7);
     if (direction === 'DEBIT') {
       demoState.totalExpense += amount;
+      demoState.todayTotalExpense += amount;
     }
     demoState.txCount += 1;
+    demoState.todayTxCount += 1;
     return mockRes({
       transaction: {
         id: `d-${Date.now()}`, txDate: now,
@@ -102,6 +104,10 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         category: body.categoryName
           ? { name: body.categoryName, icon: CATEGORY_ICONS[body.categoryName] ?? '📋' }
           : null,
+      },
+      todaySummary: {
+        totalExpense: demoState.todayTotalExpense,
+        txCount: demoState.todayTxCount,
       },
       monthSummary: {
         totalExpense: demoState.totalExpense,

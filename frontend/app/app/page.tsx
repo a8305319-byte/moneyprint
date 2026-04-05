@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -14,6 +14,8 @@ const CATEGORIES = [
 
 type Phase = 'idle' | 'loading' | 'done' | 'error';
 
+interface TodayStats { txCount: number; totalExpense: number; }
+
 interface Result {
   transaction: {
     description: string;
@@ -21,17 +23,15 @@ interface Result {
     direction: 'DEBIT' | 'CREDIT';
     category?: { name: string; icon?: string };
   };
-  monthSummary: {
-    totalExpense: number;
-    txCount: number;
-    month: string;
-  };
+  todaySummary?: { totalExpense: number; txCount: number; };
+  monthSummary: { totalExpense: number; txCount: number; month: string; };
 }
 
 export default function AppPage() {
   const { apiFetch, demoMode } = useAuth();
   const router = useRouter();
 
+  const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
   const [direction, setDirection] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('餐飲');
@@ -39,6 +39,23 @@ export default function AppPage() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Load today's stats on mount
+  useEffect(() => {
+    const month = new Date().toISOString().slice(0, 7);
+    const today = new Date().toISOString().slice(0, 10);
+    apiFetch(`/ledger?month=${month}`)
+      .then(r => r.json())
+      .then(json => {
+        const txs: any[] = json.data ?? [];
+        const todayTxs = txs.filter(t => String(t.txDate).slice(0, 10) === today);
+        const expense = todayTxs
+          .filter(t => t.direction === 'DEBIT')
+          .reduce((s: number, t: any) => s + Number(t.amount), 0);
+        setTodayStats({ txCount: todayTxs.length, totalExpense: expense });
+      })
+      .catch(() => setTodayStats({ txCount: 0, totalExpense: 0 }));
+  }, []);
 
   const fmt = (n: number) => `NT$ ${Math.abs(n ?? 0).toLocaleString()}`;
 
@@ -59,6 +76,7 @@ export default function AppPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.message);
       setResult(json.data);
+      if (json.data?.todaySummary) setTodayStats(json.data.todaySummary);
       setPhase('done');
     } catch {
       setPhase('error');
@@ -99,6 +117,7 @@ export default function AppPage() {
       <style>{`
         @keyframes sp { to { transform: rotate(360deg); } }
         @keyframes pop { 0% { transform: scale(0.94); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
         .cat-chip:active { transform: scale(0.93); }
         .dir-btn:active { transform: scale(0.96); }
         .submit-btn:not(:disabled):active { transform: scale(0.97); }
@@ -126,11 +145,70 @@ export default function AppPage() {
 
       <div style={{ padding: '20px 16px 0' }}>
 
+        {/* ══ TODAY STATUS CARD ══ */}
+        {(phase === 'idle' || phase === 'error') && (
+          todayStats === null ? (
+            <div style={{
+              background: '#fff', borderRadius: 20, padding: '18px 20px',
+              boxShadow: '0 2px 16px rgba(15,23,42,0.07)', marginBottom: 12,
+              animation: 'shimmer 1.5s ease infinite',
+            }}>
+              <div style={{ height: 11, width: '35%', background: '#f1f5f9', borderRadius: 6, marginBottom: 10 }} />
+              <div style={{ height: 20, width: '55%', background: '#f1f5f9', borderRadius: 6 }} />
+            </div>
+          ) : todayStats.txCount > 0 ? (
+            <div style={{
+              background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+              borderRadius: 20, padding: '18px 20px',
+              boxShadow: '0 4px 20px rgba(30,27,75,0.25)', marginBottom: 12,
+              animation: 'pop 0.3s ease both',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 5 }}>今日狀態</div>
+                  <div style={{ color: '#fff', fontSize: 19, fontWeight: 800 }}>
+                    已記 {todayStats.txCount} 筆
+                    {todayStats.totalExpense > 0 && (
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginLeft: 8 }}>
+                        · {fmt(todayStats.totalExpense)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ fontSize: 30 }}>📊</div>
+              </div>
+              <div style={{
+                marginTop: 12, paddingTop: 10,
+                borderTop: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.45)', fontSize: 12,
+              }}>
+                再記一筆，今天更完整
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#fff', borderRadius: 20, padding: '18px 20px',
+              boxShadow: '0 2px 16px rgba(15,23,42,0.07)', marginBottom: 12,
+              animation: 'pop 0.3s ease both',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 5 }}>今日狀態</div>
+                  <div style={{ color: '#1e1b4b', fontSize: 19, fontWeight: 800 }}>今天還沒有記錄</div>
+                </div>
+                <div style={{ fontSize: 30 }}>💡</div>
+              </div>
+              <div style={{ marginTop: 8, color: '#94a3b8', fontSize: 12 }}>
+                開始記帳，養成好習慣 👇
+              </div>
+            </div>
+          )
+        )}
+
         {/* ══ IDLE / FORM ══ */}
         {(phase === 'idle' || phase === 'error') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, animation: 'pop 0.25s ease both' }}>
 
-            {/* Error banner */}
             {phase === 'error' && (
               <div style={{
                 background: '#fff1f2', border: '1.5px solid #fecdd3',
@@ -293,7 +371,6 @@ export default function AppPage() {
               background: '#fff', borderRadius: 20, padding: '24px 20px',
               boxShadow: '0 2px 16px rgba(15,23,42,0.07)',
             }}>
-              {/* Success badge */}
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: '#f0fdf4', borderRadius: 20, padding: '6px 14px',
@@ -333,26 +410,44 @@ export default function AppPage() {
                 </div>
               </div>
 
-              {/* Monthly accumulated */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {/* Today + Month stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 <div style={{ background: '#f8fafc', borderRadius: 14, padding: '13px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginBottom: 4 }}>本月支出</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f43f5e', letterSpacing: '-0.3px' }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.5px', marginBottom: 4 }}>今日已記</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#5b5fc7' }}>
+                    {result.todaySummary?.txCount ?? 1} 筆
+                  </div>
+                  {(result.todaySummary?.totalExpense ?? 0) > 0 && (
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                      {fmt(result.todaySummary!.totalExpense)}
+                    </div>
+                  )}
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: 14, padding: '13px 14px' }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.5px', marginBottom: 4 }}>本月已記</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f43f5e' }}>
+                    {result.monthSummary.txCount} 筆
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                     {fmt(result.monthSummary.totalExpense)}
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', borderRadius: 14, padding: '13px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginBottom: 4 }}>本月已記</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#5b5fc7' }}>
-                    {result.monthSummary.txCount} 筆
-                  </div>
-                </div>
+              </div>
+
+              {/* Psychological trigger */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(91,95,199,0.08) 0%, rgba(124,58,237,0.08) 100%)',
+                borderRadius: 12, padding: '10px 14px',
+                color: '#5b5fc7', fontSize: 12, fontWeight: 600, textAlign: 'center',
+              }}>
+                再記一筆，今天更完整 ✨
               </div>
             </div>
 
             {/* Primary: 再記一筆 */}
             <button
               onClick={reset}
+              className="next-btn"
               style={{
                 width: '100%',
                 background: 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
@@ -362,7 +457,6 @@ export default function AppPage() {
                 boxShadow: '0 8px 28px rgba(91,95,199,0.38)',
                 transition: 'transform 0.12s',
               }}
-              className="next-btn"
             >
               再記一筆
             </button>
