@@ -57,10 +57,8 @@ export default function Dashboard() {
         background: 'linear-gradient(160deg, #5b5fc7 0%, #7c3aed 100%)',
         padding: '56px 24px 72px',
       }}>
-        <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-          {user?.name} · {monthLabel}
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 2 }}>本月支出</div>
+        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 6 }}>{monthLabel}</div>
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 2 }}>支出</div>
         <div style={{ color: '#fff', fontSize: 40, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1 }}>
           {fmt(summary?.totalExpense ?? 0)}
         </div>
@@ -138,8 +136,8 @@ export default function Dashboard() {
               {recentTxs.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px 0' }}>
                   <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
-                  <div style={{ color: '#64748b', fontSize: 13 }}>本月尚無交易記錄</div>
-                  <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>請至設定匯入銀行對帳單</div>
+                  <div style={{ color: '#64748b', fontSize: 13 }}>本月還沒有記錄</div>
+                  <div style={{ color: '#cbd5e1', fontSize: 12, marginTop: 4 }}>到設定頁匯入對帳單</div>
                 </div>
               ) : recentTxs.map((tx, i) => (
                 <div key={tx.id} style={{

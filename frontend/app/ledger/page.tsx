@@ -77,8 +77,8 @@ export default function LedgerPage() {
         ) : txs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>📭</div>
-            <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>本月尚無記錄</div>
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>請至設定頁匯入銀行對帳單</div>
+            <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>這個月還沒有記錄</div>
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>到設定頁匯入對帳單就會出現</div>
           </div>
         ) : Object.entries(grouped).map(([date, items]) => {
           const dayExp = items.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);

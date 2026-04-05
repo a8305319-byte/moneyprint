@@ -158,8 +158,8 @@ export default function ReportsPage() {
             {!summary && breakdown.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px 0' }}>
                 <div style={{ fontSize: 52, marginBottom: 16 }}>📊</div>
-                <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>本月尚無資料</div>
-                <div style={{ color: '#94a3b8', fontSize: 13 }}>匯入銀行對帳單後自動產生</div>
+                <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>還沒有資料</div>
+                <div style={{ color: '#94a3b8', fontSize: 13 }}>匯入對帳單後會自動出現</div>
               </div>
             )}
           </>

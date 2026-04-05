@@ -101,7 +101,7 @@ export default function BusinessInvoicesPage() {
         ) : invoices.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🧾</div>
-            <div style={{ color: '#64748b', fontSize: 14, fontWeight: 600 }}>本月尚無{tab === 'RECEIVED' ? '進項' : '銷項'}發票</div>
+            <div style={{ color: '#64748b', fontSize: 14, fontWeight: 600 }}>這個月沒有{tab === 'RECEIVED' ? '進項' : '銷項'}發票</div>
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>

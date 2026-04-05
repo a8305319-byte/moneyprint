@@ -115,8 +115,8 @@ export default function InvoicesPage() {
         ) : invoices.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '72px 0' }}>
             <div style={{ fontSize: 52, marginBottom: 16 }}>🧾</div>
-            <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>本月尚無發票</div>
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>輸入手機條碼後點同步</div>
+            <div style={{ color: '#1e1b4b', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>還沒有發票</div>
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>填入載具條碼，點同步就會出現</div>
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
