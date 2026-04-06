@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -17,11 +17,14 @@ interface Category { categoryName: string; totalAmount: number; txCount: number;
 export default function ReportsPage() {
   const { apiFetch } = useAuth();
   const router = useRouter();
-  const [month, setMonth] = useState(MONTHS[0]);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const [month, setMonth]         = useState(MONTHS[0]);
+  const [summary, setSummary]     = useState<Summary | null>(null);
   const [breakdown, setBreakdown] = useState<Category[]>([]);
-  const [trend, setTrend] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [trend, setTrend]         = useState<any[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -36,7 +39,38 @@ export default function ReportsPage() {
     }).finally(() => setLoading(false));
   }, [month]);
 
-  const fmt = (n: number) => `NT$ ${Math.abs(n ?? 0).toLocaleString()}`;
+  // ── PDF 下載（client-side：html2canvas + jsPDF）──────────────────────────
+  async function downloadPdf() {
+    if (!reportRef.current) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF }   = await import('jspdf');
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2, backgroundColor: '#f4f6fb', logging: false, useCORS: true,
+      });
+      const imgData  = canvas.toDataURL('image/png');
+      const pdf      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfW     = pdf.internal.pageSize.getWidth();
+      const pdfH     = pdf.internal.pageSize.getHeight();
+      const imgH     = (canvas.height * pdfW) / canvas.width;
+      let heightLeft = imgH;
+      let position   = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, pdfW, imgH);
+      heightLeft -= pdfH;
+      while (heightLeft > 0) {
+        position -= pdfH;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfW, imgH);
+        heightLeft -= pdfH;
+      }
+      pdf.save(`錢跡-${month}-個人報表.pdf`);
+    } catch (e) {
+      console.error('[PDF]', e);
+    } finally { setDownloading(false); }
+  }
+
+  const fmt     = (n: number) => `NT$ ${Math.abs(n ?? 0).toLocaleString()}`;
   const hasData = summary && (summary.totalExpense > 0 || summary.totalIncome > 0);
 
   return (
@@ -45,7 +79,25 @@ export default function ReportsPage() {
 
       {/* Header */}
       <div style={{ background: 'linear-gradient(160deg, #10b981 0%, #059669 100%)', padding: '56px 20px 24px' }}>
-        <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginBottom: 18 }}>報表</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>報表</div>
+          {/* PDF 下載按鈕 */}
+          {hasData && (
+            <button onClick={downloadPdf} disabled={downloading} style={{
+              background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)',
+              borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600,
+              padding: '7px 14px', cursor: downloading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              {downloading ? (
+                <>
+                  <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  產製中
+                </>
+              ) : '↓ PDF'}
+            </button>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
           {MONTHS.map(m => (
             <button key={m} onClick={() => setMonth(m)} style={{
@@ -58,13 +110,13 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div style={{ padding: '16px 16px 32px' }}>
+      {/* 可擷取的報表主體（PDF 用） */}
+      <div ref={reportRef} style={{ padding: '16px 16px 32px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(16,185,129,0.15)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           </div>
         ) : !hasData ? (
-          /* ── Empty state ── */
           <div style={{ textAlign: 'center', padding: '80px 24px' }}>
             <div style={{
               width: 64, height: 64, borderRadius: 22,
@@ -87,30 +139,21 @@ export default function ReportsPage() {
           </div>
         ) : (
           <>
-            {/* Summary — 2 big + 1 full-width */}
+            {/* Summary cards */}
             {summary && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   {[
                     { label: '支出', value: summary.totalExpense, color: '#f43f5e' },
-                    { label: '收入', value: summary.totalIncome, color: '#10b981' },
+                    { label: '收入', value: summary.totalIncome,  color: '#10b981' },
                   ].map(c => (
-                    <div key={c.label} style={{
-                      background: '#fff', borderRadius: 18, padding: '18px 16px',
-                      boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
-                    }}>
+                    <div key={c.label} style={{ background: '#fff', borderRadius: 18, padding: '18px 16px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
                       <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>{c.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: c.color, letterSpacing: '-0.5px' }}>
-                        {fmt(c.value)}
-                      </div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.value)}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{
-                  background: '#fff', borderRadius: 18, padding: '18px 16px',
-                  boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
+                <div style={{ background: '#fff', borderRadius: 18, padding: '18px 16px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>淨額</div>
                     <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.5px', color: (summary.netFlow ?? 0) >= 0 ? '#10b981' : '#f43f5e' }}>
@@ -136,7 +179,7 @@ export default function ReportsPage() {
                       cursor={{ fill: 'rgba(91,95,199,0.04)' }}
                     />
                     <Bar dataKey="totalExpense" name="支出" fill="#f43f5e" radius={[6, 6, 0, 0]} maxBarSize={20} />
-                    <Bar dataKey="totalIncome" name="收入" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={20} />
+                    <Bar dataKey="totalIncome"  name="收入" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 12 }}>

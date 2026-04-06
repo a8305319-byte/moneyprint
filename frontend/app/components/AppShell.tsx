@@ -52,7 +52,7 @@ function formatTimeLeft(expiresAt: number): string {
 }
 
 // ── Shell ──────────────────────────────────────────────────────────────────────
-const PUBLIC_PATHS = ['/', '/login'];
+const PUBLIC_PATHS = ['/', '/login', '/demo'];
 
 function ShellInner({ children }: { children: ReactNode }) {
   const { user, loading, demoMode, trialExpired, trialExpiresAt } = useAuth();

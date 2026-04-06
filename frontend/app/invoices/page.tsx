@@ -19,13 +19,17 @@ export default function InvoicesPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
   const [syncCount, setSyncCount] = useState(0);
+  const [syncError, setSyncError] = useState('');
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(MONTHS[0]);
 
-  async function load() {
+  // load() 回傳最新筆數，供 sync() 計算差值
+  async function load(): Promise<number> {
     const res = await apiFetch(`/invoices?month=${month}`);
     const json = await res.json();
-    setInvoices(json.data ?? []);
+    const newInvoices: Invoice[] = json.data ?? [];
+    setInvoices(newInvoices);
+    return newInvoices.length;
   }
 
   useEffect(() => {
@@ -34,14 +38,20 @@ export default function InvoicesPage() {
   }, [month]);
 
   async function sync() {
-    setSyncing(true); setSyncDone(false);
+    if (!carrier.trim()) {
+      setSyncError('請先填入手機條碼載具（格式：/XXXXXXX）');
+      return;
+    }
+    setSyncing(true); setSyncDone(false); setSyncError('');
     try {
       const prevCount = invoices.length;
       await apiFetch(`/invoices/sync?carrier=${encodeURIComponent(carrier)}`, { method: 'POST' });
-      await load();
-      setSyncCount(invoices.length - prevCount);
+      const newCount = await load();           // 取得同步後正確筆數
+      setSyncCount(newCount - prevCount);      // 計算新增數
       setSyncDone(true);
       setTimeout(() => setSyncDone(false), 3500);
+    } catch {
+      setSyncError('同步失敗，請確認載具後再試');
     } finally { setSyncing(false); }
   }
 
@@ -78,15 +88,15 @@ export default function InvoicesPage() {
           <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8 }}>手機條碼載具</div>
           <div style={{ display: 'flex', gap: 10 }}>
             <input
-              value={carrier} onChange={e => setCarrier(e.target.value)}
+              value={carrier} onChange={e => { setCarrier(e.target.value); setSyncError(''); }}
               placeholder="/XXXXXXX"
               style={{
-                flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 12,
+                flex: 1, border: `1.5px solid ${syncError ? '#fecdd3' : '#e2e8f0'}`, borderRadius: 12,
                 padding: '11px 14px', fontSize: 14, outline: 'none', color: '#1e1b4b',
                 boxSizing: 'border-box',
               }}
               onFocus={e => (e.target.style.borderColor = '#f43f5e')}
-              onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+              onBlur={e => (e.target.style.borderColor = syncError ? '#fecdd3' : '#e2e8f0')}
             />
             <button onClick={sync} disabled={syncing} style={{
               background: syncing ? '#fecdd3' : 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
@@ -103,6 +113,9 @@ export default function InvoicesPage() {
               ) : '同步'}
             </button>
           </div>
+          {syncError && (
+            <div style={{ marginTop: 8, color: '#e11d48', fontSize: 12, fontWeight: 600 }}>{syncError}</div>
+          )}
           {syncDone && (
             <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', color: '#059669', fontSize: 13, fontWeight: 600 }}>
               ✓ 同步完成{syncCount > 0 ? `，新增 ${syncCount} 張發票` : '，已是最新'}

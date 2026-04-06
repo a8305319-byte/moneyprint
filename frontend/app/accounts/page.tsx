@@ -208,19 +208,18 @@ export default function AccountsPage() {
         {/* Quick links */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           {[
-            { href: '/invoices', icon: '🧾', label: '電子發票', sub: '同步手機載具', locked: demoMode },
-            { href: '/matches',  icon: '⇄',  label: '交易配對', sub: '帳單 × 發票', locked: demoMode },
+            { href: '/invoices', icon: '🧾', label: '電子發票', sub: '同步手機載具', demoSub: '需真實帳號才能同步' },
+            { href: '/matches',  icon: '⇄',  label: '交易配對', sub: '帳單 × 發票',  demoSub: '需匯入銀行對帳單' },
           ].map(c => (
             <Link key={c.href} href={c.href} style={{
               background: '#fff', borderRadius: 18, padding: '18px 16px',
               textDecoration: 'none', boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
-              display: 'block', position: 'relative', overflow: 'hidden',
-              opacity: c.locked ? 0.6 : 1,
+              display: 'block',
             }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>{c.icon}</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>{c.label}</div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
-                {c.locked ? '需建立帳號' : c.sub}
+                {demoMode ? c.demoSub : c.sub}
               </div>
             </Link>
           ))}

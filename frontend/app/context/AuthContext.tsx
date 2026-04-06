@@ -7,8 +7,7 @@ if (typeof window === 'undefined' && !process.env.NEXT_PUBLIC_API_URL) {
   console.warn('[錢跡] NEXT_PUBLIC_API_URL is not set');
 }
 
-// 試用期 24 小時
-const TRIAL_MS = 24 * 60 * 60 * 1000;
+const TRIAL_MS = 24 * 60 * 60 * 1000; // 24 小時試用期
 
 interface User {
   id: string; email: string; name: string; mode: 'PERSONAL' | 'BUSINESS';
@@ -45,12 +44,11 @@ const CATEGORY_ICONS: Record<string, string> = {
   餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
 };
 
-// ── 初始示範資料（相對於「今天」往前推算，讓 demo 不空白）─────────────────────
-const _now = new Date();
+// ── 初始示範交易資料（相對於今天往前推，讓 demo 不空白）──────────────────────
+const _now      = new Date();
 const _todayDay = _now.getDate();
-const _ym = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
-const _mkDate = (day: number) =>
-  `${_ym}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
+const _ym       = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
+const _mkDate   = (day: number) => `${_ym}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
 
 interface DemoTxTpl {
   id: string; day: number; description: string;
@@ -58,7 +56,6 @@ interface DemoTxTpl {
   category: { name: string; icon: string };
 }
 
-// 固定放在月初幾天，只有「< 今天」的才會帶入，避免跨月或未來日期問題
 const DEMO_TX_TEMPLATES: DemoTxTpl[] = [
   { id: 'd-s-1', day: 1, description: '早餐',     amount: '65',    direction: 'DEBIT',  category: { name: '餐飲', icon: '🍱' } },
   { id: 'd-s-2', day: 1, description: '搭捷運',   amount: '28',    direction: 'DEBIT',  category: { name: '交通', icon: '🚇' } },
@@ -71,29 +68,27 @@ const DEMO_TX_TEMPLATES: DemoTxTpl[] = [
   { id: 'd-s-9', day: 5, description: '便利商店', amount: '85',    direction: 'DEBIT',  category: { name: '購物', icon: '🛍' } },
 ];
 
-const _seedTxs = DEMO_TX_TEMPLATES
-  .filter(t => t.day < _todayDay)          // 只帶過去的日期
+// 只帶入「今天之前」的日期，避免跨月或未來日期問題
+const _seedTxs    = DEMO_TX_TEMPLATES
+  .filter(t => t.day < _todayDay)
   .map(t => ({
-    id: t.id,
-    txDate: _mkDate(t.day),
-    description: t.description,
-    amount: t.amount,
-    direction: t.direction,
-    status: 'DONE' as const,
-    category: t.category,
+    id: t.id, txDate: _mkDate(t.day),
+    description: t.description, amount: t.amount,
+    direction: t.direction, status: 'DONE' as const, category: t.category,
   }));
 
 const _seedDebit  = _seedTxs.filter(t => t.direction === 'DEBIT');
 const _seedCredit = _seedTxs.filter(t => t.direction === 'CREDIT');
 
-// Demo state：帶入初始示範資料；新增/刪除仍在記憶體，刷新重置
+// Demo state — 含初始示範資料；刷新後重置（設計如此）
 const demoState = {
   txCount:           _seedTxs.length,
   totalExpense:      _seedDebit.reduce((s, t)  => s + Number(t.amount), 0),
   totalIncome:       _seedCredit.reduce((s, t) => s + Number(t.amount), 0),
   todayTxCount:      0,
   todayTotalExpense: 0,
-  txs: [..._seedTxs] as any[],
+  txs:               [..._seedTxs] as any[],
+  businessInvoices:  [] as any[],   // 公司模式發票（demo 內儲存）
 };
 
 function mockRes(data: any): Response {
@@ -104,10 +99,11 @@ function mockRes(data: any): Response {
 }
 
 function mockApiFetch(url: string, opts: RequestInit = {}): Response {
-  const method = (opts.method ?? 'GET').toUpperCase();
-  const path = url.split('?')[0];
+  const method             = (opts.method ?? 'GET').toUpperCase();
+  const [path, queryStr]   = url.split('?');
+  const params             = new URLSearchParams(queryStr ?? '');
 
-  // DELETE /ledger/:id
+  // ── DELETE /ledger/:id ────────────────────────────────────────────────────
   if (method === 'DELETE' && /\/ledger\//.test(path)) {
     const id = path.split('/ledger/')[1];
     const tx = demoState.txs.find(t => t.id === id);
@@ -119,7 +115,7 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         const today = new Date().toISOString().slice(0, 10);
         if (String(tx.txDate).slice(0, 10) === today) {
           demoState.todayTotalExpense = Math.max(0, demoState.todayTotalExpense - Number(tx.amount));
-          demoState.todayTxCount = Math.max(0, demoState.todayTxCount - 1);
+          demoState.todayTxCount      = Math.max(0, demoState.todayTxCount - 1);
         }
       } else {
         demoState.totalIncome = Math.max(0, demoState.totalIncome - Number(tx.amount));
@@ -128,15 +124,15 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
     return mockRes({ success: true });
   }
 
-  // POST /ledger — manual entry
+  // ── POST /ledger ──────────────────────────────────────────────────────────
   if (method === 'POST' && path.endsWith('/ledger')) {
-    const body = opts.body ? JSON.parse(opts.body as string) : {};
-    const amount = Number(body.amount) || 0;
+    const body      = opts.body ? JSON.parse(opts.body as string) : {};
+    const amount    = Number(body.amount) || 0;
     const direction = body.direction ?? 'DEBIT';
-    const today = new Date().toISOString().slice(0, 10);
-    const txDate = body.txDate ?? today;
-    const isToday = txDate === today;
-    const month = new Date().toISOString().slice(0, 7);
+    const today     = new Date().toISOString().slice(0, 10);
+    const txDate    = body.txDate ?? today;
+    const isToday   = txDate === today;
+    const month     = new Date().toISOString().slice(0, 7);
 
     if (direction === 'DEBIT') {
       demoState.totalExpense += amount;
@@ -158,43 +154,69 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         : null,
     };
     demoState.txs.unshift(newTx);
-
     return mockRes({
       transaction: newTx,
-      todaySummary: {
-        totalExpense: demoState.todayTotalExpense,
-        txCount: demoState.todayTxCount,
-      },
-      monthSummary: {
-        totalExpense: demoState.totalExpense,
-        txCount: demoState.txCount,
-        month,
-      },
+      todaySummary: { totalExpense: demoState.todayTotalExpense, txCount: demoState.todayTxCount },
+      monthSummary: { totalExpense: demoState.totalExpense, txCount: demoState.txCount, month },
     });
   }
 
-  // All other writes
+  // ── POST /business-invoices ───────────────────────────────────────────────
+  if (method === 'POST' && path.endsWith('/business-invoices')) {
+    const body      = opts.body ? JSON.parse(opts.body as string) : {};
+    const amount    = Number(body.amount) || 0;
+    const taxAmt    = body.taxType === 'TAXABLE' ? Math.round(amount * 5 / 105 * 100) / 100 : 0;
+    const untaxed   = amount - taxAmt;
+    const newInv = {
+      id:                `bi-${Date.now()}`,
+      direction:         body.direction         ?? 'RECEIVED',
+      format:            body.format            ?? 'ELECTRONIC',
+      invoiceNo:         body.invoiceNo         ?? '',
+      invoiceDate:       body.invoiceDate       ?? new Date().toISOString().slice(0, 10),
+      counterpartyName:  body.counterpartyName  ?? '',
+      counterpartyTaxId: body.counterpartyTaxId ?? '',
+      amount:            String(amount),
+      taxAmount:         String(taxAmt),
+      untaxedAmount:     String(untaxed),
+      taxType:           body.taxType           ?? 'TAXABLE',
+      description:       body.description       ?? '',
+    };
+    demoState.businessInvoices.push(newInv);
+    return mockRes({ invoice: newInv });
+  }
+
+  // ── 其他 POST / PATCH / DELETE（sync、auto-match 等）→ 成功回應 ─────────
   if (method !== 'GET') return mockRes({ success: true });
 
-  // GET endpoints
+  // ── GET 端點 ──────────────────────────────────────────────────────────────
+  const monthParam   = params.get('month');
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  // GET /reports/monthly-summary
   if (path.endsWith('/reports/monthly-summary')) {
+    // 非當月 → 回傳零（demo 資料只有當月）
+    if (monthParam && monthParam !== currentMonth) {
+      return mockRes({ totalExpense: 0, totalIncome: 0, netFlow: 0, txCount: 0 });
+    }
     return mockRes({
       totalExpense: demoState.totalExpense,
-      totalIncome: demoState.totalIncome,
-      netFlow: demoState.totalIncome - demoState.totalExpense,
-      txCount: demoState.txCount,
+      totalIncome:  demoState.totalIncome,
+      netFlow:      demoState.totalIncome - demoState.totalExpense,
+      txCount:      demoState.txCount,
     });
   }
 
+  // GET /reports/category-breakdown
   if (path.endsWith('/reports/category-breakdown')) {
+    let debitTxs = demoState.txs.filter(t => t.direction === 'DEBIT');
+    if (monthParam) debitTxs = debitTxs.filter(t => String(t.txDate).slice(0, 7) === monthParam);
+    const total     = debitTxs.reduce((s, t) => s + Number(t.amount), 0);
     const breakdown: Record<string, { totalAmount: number; txCount: number }> = {};
-    const debitTxs = demoState.txs.filter(t => t.direction === 'DEBIT');
-    const total = debitTxs.reduce((s, t) => s + Number(t.amount), 0);
     for (const tx of debitTxs) {
       const name = tx.category?.name ?? '其他';
       if (!breakdown[name]) breakdown[name] = { totalAmount: 0, txCount: 0 };
       breakdown[name].totalAmount += Number(tx.amount);
-      breakdown[name].txCount += 1;
+      breakdown[name].txCount     += 1;
     }
     return mockRes(
       Object.entries(breakdown)
@@ -206,6 +228,7 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
     );
   }
 
+  // GET /reports/monthly-trend
   if (path.endsWith('/reports/monthly-trend')) {
     return mockRes(
       Array.from({ length: 6 }, (_, i) => {
@@ -222,19 +245,55 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
     );
   }
 
+  // GET /ledger
   if (path.endsWith('/ledger')) {
-    const qs = url.includes('?') ? url.split('?')[1] : '';
-    const monthParam = new URLSearchParams(qs).get('month');
     const txs = monthParam
       ? demoState.txs.filter(t => String(t.txDate).slice(0, 7) === monthParam)
       : demoState.txs;
     return mockRes(txs);
   }
 
-  if (path.endsWith('/matches/pending'))           return mockRes([]);
-  if (path.endsWith('/invoices'))                  return mockRes([]);
-  if (path.endsWith('/business-invoices/summary')) return mockRes(null);
-  if (path.endsWith('/business-invoices'))         return mockRes([]);
+  // GET /matches/pending
+  if (path.endsWith('/matches/pending')) return mockRes([]);
+
+  // GET /invoices
+  if (path.endsWith('/invoices')) return mockRes([]);
+
+  // GET /business-invoices/summary（要在 /business-invoices 之前）
+  if (path.endsWith('/business-invoices/summary')) {
+    let invs = [...demoState.businessInvoices];
+    if (monthParam) invs = invs.filter(i => String(i.invoiceDate).slice(0, 7) === monthParam);
+    const received = invs.filter(i => i.direction === 'RECEIVED');
+    const issued   = invs.filter(i => i.direction === 'ISSUED');
+    const recTax   = received.reduce((s, i) => s + Number(i.taxAmount), 0);
+    const isTax    = issued.reduce((s,   i) => s + Number(i.taxAmount), 0);
+    return mockRes({
+      received: {
+        count:         received.length,
+        amount:        received.reduce((s, i) => s + Number(i.amount),        0),
+        untaxedAmount: received.reduce((s, i) => s + Number(i.untaxedAmount), 0),
+        taxAmount:     recTax,
+      },
+      issued: {
+        count:         issued.length,
+        amount:        issued.reduce((s, i) => s + Number(i.amount),        0),
+        untaxedAmount: issued.reduce((s, i) => s + Number(i.untaxedAmount), 0),
+        taxAmount:     isTax,
+      },
+      netTax:         isTax - recTax,
+      remainingQuota: Math.max(0, 50 - issued.length),
+    });
+  }
+
+  // GET /business-invoices（列表）
+  if (path.endsWith('/business-invoices')) {
+    const direction = params.get('direction');
+    let invs = [...demoState.businessInvoices];
+    if (direction)  invs = invs.filter(i => i.direction === direction);
+    if (monthParam) invs = invs.filter(i => String(i.invoiceDate).slice(0, 7) === monthParam);
+    return mockRes(invs);
+  }
+
   return mockRes(null);
 }
 
@@ -243,13 +302,13 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
 const AuthContext = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
-  const [trialExpired, setTrialExpired] = useState(false);
+  const [user, setUser]                   = useState<User | null>(null);
+  const [token, setToken]                 = useState<string | null>(null);
+  const [loading, setLoading]             = useState(true);
+  const [demoMode, setDemoMode]           = useState(false);
+  const [trialExpired, setTrialExpired]   = useState(false);
   const [trialExpiresAt, setTrialExpiresAt] = useState<number | null>(null);
-  const demoRef = useRef(false);
+  const demoRef   = useRef(false);
   const logoutRef = useRef<() => void>(() => {});
 
   const logout = useCallback(() => {
@@ -273,7 +332,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!localStorage.getItem('mp_trial_start')) {
       localStorage.setItem('mp_trial_start', String(Date.now()));
     }
-    const start = parseInt(localStorage.getItem('mp_trial_start')!);
+    const start     = parseInt(localStorage.getItem('mp_trial_start')!);
     const expiresAt = start + TRIAL_MS;
     setTrialExpiresAt(expiresAt);
     setTrialExpired(Date.now() >= expiresAt);
@@ -304,7 +363,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDemoMode(true);
       setUser(DEMO_USER);
       setToken('demo');
-      // 試用期計算
       let start = parseInt(localStorage.getItem('mp_trial_start') ?? '0');
       if (!start) {
         start = Date.now();
@@ -332,8 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
     const json = await res.json();
@@ -341,9 +398,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('mp_demo');
     localStorage.removeItem('mp_trial_start');
     demoRef.current = false;
-    setDemoMode(false);
-    setTrialExpired(false);
-    setTrialExpiresAt(null);
+    setDemoMode(false); setTrialExpired(false); setTrialExpiresAt(null);
     localStorage.setItem('mp_token', json.data.token);
     setToken(json.data.token);
     setUser(json.data.user);
@@ -351,8 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: { email: string; password: string; name: string }) => {
     const res = await fetch(`${API}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     const json = await res.json();
@@ -360,9 +414,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('mp_demo');
     localStorage.removeItem('mp_trial_start');
     demoRef.current = false;
-    setDemoMode(false);
-    setTrialExpired(false);
-    setTrialExpiresAt(null);
+    setDemoMode(false); setTrialExpired(false); setTrialExpiresAt(null);
     localStorage.setItem('mp_token', json.data.token);
     setToken(json.data.token);
     setUser(json.data.user);
@@ -376,7 +428,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (data: any) => {
     if (demoRef.current) return;
-    const res = await apiFetch('/auth/update-profile', { method: 'POST', body: JSON.stringify(data) });
+    const res  = await apiFetch('/auth/update-profile', { method: 'POST', body: JSON.stringify(data) });
     const json = await res.json();
     if (res.ok) setUser(json.data);
   };
