@@ -18,7 +18,7 @@ type SyncState = 'idle' | 'syncing' | 'done' | 'error' | 'no_app_id';
 
 export default function InvoicesPage() {
   useAuthGuard();
-  const { apiFetch } = useAuth();
+  const { apiFetch, demoMode } = useAuth();
 
   const [invoices,    setInvoices]    = useState<Invoice[]>([]);
   const [listMonth,   setListMonth]   = useState(MONTHS[0]);
@@ -60,6 +60,11 @@ export default function InvoicesPage() {
   }
 
   async function sync() {
+    if (demoMode) {
+      setSyncState('error');
+      setSyncError('示範模式不支援真實同步。請建立帳號後使用此功能。');
+      return;
+    }
     if (!cardNo.trim() || !CARD_NO_RE.test(cardNo)) {
       setSyncError('手機條碼格式錯誤（/XXXXXXX，/ 開頭 + 7 碼大寫英數）');
       return;
@@ -95,7 +100,12 @@ export default function InvoicesPage() {
       }
 
       const result = j.data ?? j;
-      setSyncResult({ synced: result.synced, already: result.already, total: result.total });
+      if (!result || typeof result.synced === 'undefined') {
+        setSyncState('error');
+        setSyncError('伺服器回傳格式異常，請稍後再試');
+        return;
+      }
+      setSyncResult({ synced: result.synced ?? 0, already: result.already ?? 0, total: result.total ?? 0 });
       setSyncState('done');
       // 清除驗證碼（安全）
       setCardEncrypt('');
@@ -146,6 +156,13 @@ export default function InvoicesPage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>手機條碼載具同步</div>
             <span style={{ fontSize: 10, background: '#ecfdf5', color: '#059669', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>財政部電子發票</span>
           </div>
+
+          {/* demo mode notice */}
+          {demoMode && (
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#0369a1', lineHeight: 1.7 }}>
+              ℹ️ 示範模式僅供體驗，真實發票同步需建立正式帳號。
+            </div>
+          )}
 
           {/* no_app_id 狀態 */}
           {syncState === 'no_app_id' && (
