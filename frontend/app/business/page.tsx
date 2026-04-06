@@ -2,10 +2,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 export default function BusinessDashboard() {
+  useAuthGuard({ requireBusiness: true });
   const { user, apiFetch } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);

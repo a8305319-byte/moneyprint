@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 interface Match {
   id: string; confidence: number;
@@ -11,6 +12,7 @@ interface Match {
 }
 
 export default function MatchesPage() {
+  useAuthGuard();
   const { apiFetch } = useAuth();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);

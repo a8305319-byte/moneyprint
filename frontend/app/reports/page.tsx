@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#5b5fc7', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#8b5cf6'];
@@ -15,6 +16,7 @@ interface Summary { month: string; totalIncome: number; totalExpense: number; ne
 interface Category { categoryName: string; totalAmount: number; txCount: number; percentage: number; }
 
 export default function ReportsPage() {
+  useAuthGuard();
   const { apiFetch } = useAuth();
   const router = useRouter();
   const reportRef = useRef<HTMLDivElement>(null);

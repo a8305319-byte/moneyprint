@@ -3,8 +3,10 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 export default function AccountsPage() {
+  useAuthGuard();
   const { user, logout, switchMode, updateProfile, demoMode } = useAuth();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);

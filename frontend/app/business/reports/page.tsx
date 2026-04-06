@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
 
 const MONTHS = Array.from({ length: 6 }, (_, i) => {
   const d = new Date(); d.setMonth(d.getMonth() - i);
@@ -8,6 +9,7 @@ const MONTHS = Array.from({ length: 6 }, (_, i) => {
 });
 
 export default function BusinessReportsPage() {
+  useAuthGuard({ requireBusiness: true });
   const { apiFetch, demoMode } = useAuth();
   const reportRef = useRef<HTMLDivElement>(null);
   const [month, setMonth]           = useState(MONTHS[0]);

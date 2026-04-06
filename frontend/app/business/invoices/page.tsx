@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
 
 const MONTHS = Array.from({ length: 6 }, (_, i) => {
   const d = new Date(); d.setMonth(d.getMonth() - i);
@@ -13,6 +14,7 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export default function BusinessInvoicesPage() {
+  useAuthGuard({ requireBusiness: true });
   const { apiFetch } = useAuth();
   const [tab, setTab] = useState<'RECEIVED' | 'ISSUED'>('RECEIVED');
   const [invoices, setInvoices] = useState<any[]>([]);

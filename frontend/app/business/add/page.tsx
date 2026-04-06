@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
 
 const FORMATS = [
   { value: 'ELECTRONIC', label: '電子發票' },
@@ -12,6 +13,7 @@ const FORMATS = [
 ];
 
 export default function AddInvoicePage() {
+  useAuthGuard({ requireBusiness: true });
   const { apiFetch } = useAuth();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 interface Invoice {
   id: string; invoiceNo: string; invoiceDate: string;
@@ -13,6 +14,7 @@ const MONTHS = Array.from({ length: 3 }, (_, i) => {
 });
 
 export default function InvoicesPage() {
+  useAuthGuard();
   const { apiFetch } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [carrier, setCarrier] = useState('');

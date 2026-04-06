@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 interface LedgerTx {
   id: string; txDate: string; description: string;
@@ -27,6 +28,7 @@ function formatGroupDate(txDate: string): string {
 }
 
 export default function LedgerPage() {
+  useAuthGuard();
   const { apiFetch } = useAuth();
   const router = useRouter();
   const [txs, setTxs] = useState<LedgerTx[]>([]);

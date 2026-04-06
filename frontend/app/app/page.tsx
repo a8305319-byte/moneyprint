@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const CATEGORIES = [
   { name: '餐飲', icon: '🍱' },
@@ -30,6 +31,7 @@ interface Result {
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function AppPage() {
+  useAuthGuard();
   const { apiFetch, demoMode, user } = useAuth();
   const router = useRouter();
 
