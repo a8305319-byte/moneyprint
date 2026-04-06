@@ -80,16 +80,62 @@ const _seedTxs    = DEMO_TX_TEMPLATES
 const _seedDebit  = _seedTxs.filter(t => t.direction === 'DEBIT');
 const _seedCredit = _seedTxs.filter(t => t.direction === 'CREDIT');
 
-// Demo state — 含初始示範資料；刷新後重置（設計如此）
-const demoState = {
+// Demo state — 含初始示範資料；透過 localStorage 做跨頁刷新持久化
+const DEMO_STATE_KEY = 'mp_demo_state';
+
+const _defaultDemoState = () => ({
   txCount:           _seedTxs.length,
   totalExpense:      _seedDebit.reduce((s, t)  => s + Number(t.amount), 0),
   totalIncome:       _seedCredit.reduce((s, t) => s + Number(t.amount), 0),
   todayTxCount:      0,
   todayTotalExpense: 0,
   txs:               [..._seedTxs] as any[],
-  businessInvoices:  [] as any[],   // 公司模式發票（demo 內儲存）
-};
+  businessInvoices:  [] as any[],
+});
+
+const demoState = _defaultDemoState();
+
+/** 從 localStorage 載入 demo 狀態（client only），覆寫 demoState */
+function initDemoStateFromStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(DEMO_STATE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p && typeof p.txCount === 'number' && Array.isArray(p.txs)) {
+      demoState.txCount           = p.txCount           ?? demoState.txCount;
+      demoState.totalExpense      = p.totalExpense       ?? demoState.totalExpense;
+      demoState.totalIncome       = p.totalIncome        ?? demoState.totalIncome;
+      demoState.todayTxCount      = p.todayTxCount       ?? 0;
+      demoState.todayTotalExpense = p.todayTotalExpense  ?? 0;
+      demoState.txs               = p.txs               ?? [];
+      demoState.businessInvoices  = p.businessInvoices  ?? [];
+    }
+  } catch { /* ignore parse errors */ }
+}
+
+/** 將 demoState 寫回 localStorage */
+function saveDemoState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DEMO_STATE_KEY, JSON.stringify(demoState));
+  } catch { /* storage full or private mode */ }
+}
+
+/** 清除 localStorage 中的 demo 狀態 */
+function clearDemoState(): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.removeItem(DEMO_STATE_KEY); } catch { /* ignore */ }
+  // Reset in-memory state back to seeds
+  const fresh = _defaultDemoState();
+  demoState.txCount           = fresh.txCount;
+  demoState.totalExpense      = fresh.totalExpense;
+  demoState.totalIncome       = fresh.totalIncome;
+  demoState.todayTxCount      = fresh.todayTxCount;
+  demoState.todayTotalExpense = fresh.todayTotalExpense;
+  demoState.txs               = fresh.txs;
+  demoState.businessInvoices  = fresh.businessInvoices;
+}
 
 function mockRes(data: any): Response {
   return new Response(JSON.stringify({ data }), {
@@ -121,6 +167,7 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         demoState.totalIncome = Math.max(0, demoState.totalIncome - Number(tx.amount));
       }
     }
+    saveDemoState();
     return mockRes({ success: true });
   }
 
@@ -154,6 +201,7 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         : null,
     };
     demoState.txs.unshift(newTx);
+    saveDemoState();
     return mockRes({
       transaction: newTx,
       todaySummary: { totalExpense: demoState.todayTotalExpense, txCount: demoState.todayTxCount },
@@ -182,6 +230,7 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
       description:       body.description       ?? '',
     };
     demoState.businessInvoices.push(newInv);
+    saveDemoState();
     return mockRes({ invoice: newInv });
   }
 
@@ -315,6 +364,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('mp_token');
     localStorage.removeItem('mp_demo');
     localStorage.removeItem('mp_trial_start');
+    clearDemoState();          // 清除 demo localStorage 並重置 in-memory state
     demoRef.current = false;
     setDemoMode(false);
     setTrialExpired(false);
@@ -332,6 +382,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!localStorage.getItem('mp_trial_start')) {
       localStorage.setItem('mp_trial_start', String(Date.now()));
     }
+    // 載入該裝置/瀏覽器已有的 demo 資料（跨頁刷新持久化）
+    initDemoStateFromStorage();
     const start     = parseInt(localStorage.getItem('mp_trial_start')!);
     const expiresAt = start + TRIAL_MS;
     setTrialExpiresAt(expiresAt);
@@ -359,6 +411,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refetch = useCallback(async () => {
     if (localStorage.getItem('mp_demo')) {
+      // 從 localStorage 恢復此裝置的 demo 資料（刷新後不清空）
+      initDemoStateFromStorage();
       demoRef.current = true;
       setDemoMode(true);
       setUser(DEMO_USER);
