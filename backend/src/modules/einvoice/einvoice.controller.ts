@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EinvoiceService } from './einvoice.service';
 
@@ -7,13 +7,10 @@ import { EinvoiceService } from './einvoice.service';
 export class EinvoiceController {
   constructor(private readonly svc: EinvoiceService) {}
 
-  @Post('sync')
-  sync(@Request() req: any, @Body() body: { carrier: string; cardNo?: string; cardEncrypt?: string }) {
-    return this.svc.syncFromMOF(body.carrier, body.cardNo, body.cardEncrypt);
-  }
-
-  @Get('query')
-  query(@Query('carrier') carrier: string, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
-    return this.svc.queryInvoices(carrier, startDate, endDate);
+  // ── 驗證手機條碼格式是否在財政部已登記
+  // POST /einvoice/validate
+  @Post('validate')
+  validateCardNo(@Body() body: { cardNo: string }) {
+    return this.svc.validateCardNo(body.cardNo);
   }
 }

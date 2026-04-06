@@ -68,6 +68,11 @@ enum AppMode {
   BUSINESS
 }
 
+enum InvoiceSource {
+  MOF_CARRIER   // 財政部手機條碼載具同步
+  MANUAL        // 手動新增
+}
+
 // ── Auth User ──────────────────────────────────────────
 model AppUser {
   id               String              @id @default(cuid())
@@ -85,6 +90,7 @@ model AppUser {
   categories       Category[]
   invoiceRecords   InvoiceRecord[]
   ledgerTransactions LedgerTransaction[]
+  carrierBinding   CarrierBinding?
 
   @@index([email])
 }
@@ -137,22 +143,38 @@ model BankTransaction {
 }
 
 model InvoiceRecord {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String?
-  user        AppUser?  @relation(fields: [userId], references: [id])
-  invoiceNo   String    @unique
+  user        AppUser?      @relation(fields: [userId], references: [id])
+  invoiceNo   String        @unique          // 財政部發票號碼（全球唯一）
   invoiceDate DateTime
   sellerName  String
   sellerTaxId String?
-  amount      Decimal   @db.Decimal(12, 2)
-  taxAmount   Decimal   @db.Decimal(12, 2) @default(0)
-  carrier     String?
+  amount      Decimal       @db.Decimal(12, 2)
+  taxAmount   Decimal       @db.Decimal(12, 2) @default(0)
+  carrier     String?                        // 手機條碼（/XXXXXXX）
+  source      InvoiceSource @default(MANUAL) // 資料來源（防止 mock 混入）
   rawData     Json?
-  syncedAt    DateTime  @default(now())
+  syncedAt    DateTime      @default(now())
   ledger      LedgerTransaction?
   matchItems  TransactionMatchItem[]
 
   @@index([invoiceDate])
+  @@index([userId])
+  @@index([source])
+}
+
+// ── 手機條碼載具綁定（每 user 一筆，cardEncrypt 不儲存）─────
+model CarrierBinding {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          AppUser   @relation(fields: [userId], references: [id])
+  cardNo        String                         // /XXXXXXX 手機條碼
+  lastSyncedAt  DateTime?                      // 上次同步時間（rate limit 用）
+  lastSyncMonth String?                        // 上次同步月份 YYYY-MM
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
   @@index([userId])
 }
 
