@@ -1,6 +1,6 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+builder = "NIXPACKS"
 
 [deploy]
+startCommand = "npx prisma db push --accept-data-loss && node dist/main"
 restartPolicyType = "ON_FAILURE"
