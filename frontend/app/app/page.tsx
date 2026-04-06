@@ -53,7 +53,7 @@ export default function AppPage() {
     apiFetch(`/ledger?month=${month}`)
       .then(r => r.json())
       .then(json => {
-        const txs: any[] = json.data ?? [];
+        const txs: any[] = json.data?.data ?? json.data ?? [];
         const todayTxs = txs.filter(t => String(t.txDate).slice(0, 10) === today);
         const expense = todayTxs
           .filter(t => t.direction === 'DEBIT')

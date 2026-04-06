@@ -41,7 +41,7 @@ export default function LedgerPage() {
   useEffect(() => {
     setLoading(true);
     apiFetch(`/ledger?month=${month}`)
-      .then(r => r.json()).then(d => setTxs(d.data ?? []))
+      .then(r => r.json()).then(d => setTxs(d.data?.data ?? d.data ?? []))
       .catch(() => setTxs([])).finally(() => setLoading(false));
   }, [month]);
 
