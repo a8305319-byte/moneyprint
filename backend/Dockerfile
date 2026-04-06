@@ -16,4 +16,4 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && echo 'Starting node...' && node dist/main 2>&1"]
+CMD ["/bin/sh", "-c", "set -x; npx prisma db push --accept-data-loss; echo PRISMA_EXIT:$?; ls dist/main.js 2>&1; node dist/main 2>&1; echo NODE_EXIT:$?"]
