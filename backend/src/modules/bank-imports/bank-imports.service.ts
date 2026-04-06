@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -8,6 +8,13 @@ export class BankImportsService {
 
   async enqueueImport(userId: string, accountId: string, file: Express.Multer.File) {
     if (!file) throw new BadRequestException('需要上傳檔案');
+
+    // 驗證 accountId 屬於當前 user
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, userId },
+    });
+    if (!account) throw new ForbiddenException('帳戶不存在或無權存取');
+
     const imp = await this.prisma.bankImport.create({
       data: { accountId, filename: file.originalname, status: 'PROCESSING' },
     });
@@ -63,21 +70,20 @@ export class BankImportsService {
     }
   }
 
-  async getStatus(importId: string) {
-    return this.prisma.bankImport.findUnique({
-      where: { id: importId },
+  /** getStatus 必須驗證 import 屬於當前 user（透過 account.userId） */
+  async getStatus(userId: string, importId: string) {
+    const imp = await this.prisma.bankImport.findFirst({
+      where: { id: importId, account: { userId } },
       select: { id: true, status: true, rowCount: true, filename: true, importedAt: true },
     });
+    if (!imp) throw new NotFoundException('找不到此匯入記錄或無權存取');
+    return imp;
   }
 
-  async list(userId: string, accountId: string) {
-    const where: any = {};
-    if (accountId) {
-      where.accountId = accountId;
-    } else {
-      // Filter via account.userId
-      where.account = { userId };
-    }
+  /** list 永遠加上 account.userId 隔離，即使有傳入 accountId 也一樣 */
+  async list(userId: string, accountId?: string) {
+    const where: any = { account: { userId } };
+    if (accountId) where.accountId = accountId;
     return this.prisma.bankImport.findMany({
       where,
       orderBy: { importedAt: 'desc' },

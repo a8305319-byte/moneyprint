@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -95,17 +95,38 @@ export class MatchingService {
     });
   }
 
-  async confirmMatch(id: string) {
+  /** confirm 前先驗 owner：match 的任一 item 必須屬於 userId */
+  async confirmMatch(userId: string, id: string) {
+    await this.assertOwner(userId, id);
     return this.prisma.transactionMatch.update({
       where: { id },
       data: { status: 'CONFIRMED' },
     });
   }
 
-  async rejectMatch(id: string) {
+  /** reject 前先驗 owner */
+  async rejectMatch(userId: string, id: string) {
+    await this.assertOwner(userId, id);
     return this.prisma.transactionMatch.update({
       where: { id },
       data: { status: 'REJECTED' },
     });
+  }
+
+  private async assertOwner(userId: string, matchId: string) {
+    const match = await this.prisma.transactionMatch.findFirst({
+      where: {
+        id: matchId,
+        items: {
+          some: {
+            OR: [
+              { bankTx: { account: { userId } } },
+              { invoice: { userId } },
+            ],
+          },
+        },
+      },
+    });
+    if (!match) throw new ForbiddenException('無權操作此配對記錄');
   }
 }

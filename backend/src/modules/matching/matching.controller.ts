@@ -14,8 +14,12 @@ export class MatchingController {
   pending(@Request() req: any) { return this.svc.listPending(req.user.userId); }
 
   @Post(':id/confirm')
-  confirm(@Param('id') id: string) { return this.svc.confirmMatch(id); }
+  confirm(@Request() req: any, @Param('id') id: string) {
+    return this.svc.confirmMatch(req.user.userId, id);
+  }
 
   @Post(':id/reject')
-  reject(@Param('id') id: string) { return this.svc.rejectMatch(id); }
+  reject(@Request() req: any, @Param('id') id: string) {
+    return this.svc.rejectMatch(req.user.userId, id);
+  }
 }

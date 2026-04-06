@@ -19,8 +19,8 @@ export class BankImportsController {
   }
 
   @Get(':id/status')
-  status(@Param('id') id: string) {
-    return this.svc.getStatus(id);
+  status(@Request() req: any, @Param('id') id: string) {
+    return this.svc.getStatus(req.user.userId, id);
   }
 
   @Get()

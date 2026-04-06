@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const SYSTEM_RULES = [
@@ -19,9 +19,10 @@ export class CategoriesService {
     return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
   }
 
-  async classifyPending() {
+  /** 只分類當前 userId 的 PENDING 交易，不可觸碰其他用戶資料 */
+  async classifyPending(userId: string) {
     const pending = await this.prisma.ledgerTransaction.findMany({
-      where: { status: 'PENDING', categoryId: null },
+      where: { userId, status: 'PENDING', categoryId: null },
       take: 500,
     });
 
@@ -44,7 +45,13 @@ export class CategoriesService {
     return { classified };
   }
 
-  async manualSet(ledgerId: string, categoryId: string) {
+  /** 手動設定分類：先驗 owner，再更新 */
+  async manualSet(userId: string, ledgerId: string, categoryId: string) {
+    const existing = await this.prisma.ledgerTransaction.findUnique({ where: { id: ledgerId } });
+    if (!existing || existing.userId !== userId) {
+      throw new ForbiddenException('無權修改此記錄');
+    }
+
     const tx = await this.prisma.ledgerTransaction.update({
       where: { id: ledgerId },
       data: { categoryId, status: 'CATEGORIZED' },
