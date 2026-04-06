@@ -28,21 +28,11 @@ export default function LoginPage() {
     finally { setLoading(false); }
   }
 
-  const inputStyle: React.CSSProperties = {
+  const inp: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 14,
     padding: '15px 16px', fontSize: 15, outline: 'none', color: '#1e1b4b',
     background: '#f8fafc', boxSizing: 'border-box', display: 'block',
   };
-
-  const Field = ({ placeholder, k, type = 'text' }: { placeholder: string; k: string; type?: string }) => (
-    <input
-      type={type} placeholder={placeholder} value={(form as any)[k]}
-      onChange={set(k)} onKeyDown={e => e.key === 'Enter' && submit()}
-      style={inputStyle}
-      onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
-      onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
-    />
-  );
 
   return (
     <div style={{
@@ -73,10 +63,38 @@ export default function LoginPage() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Field placeholder="Email" k="email" type="email" />
-          <Field placeholder="密碼" k="password" type="password" />
+          {/* Email — 直接 inline，避免 Field 在函數內定義導致每次 re-render 重新 mount */}
+          <input
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={set('email')}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            style={inp}
+            onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
+            onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+          />
+          <input
+            type="password"
+            placeholder="密碼"
+            value={form.password}
+            onChange={set('password')}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            style={inp}
+            onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
+            onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+          />
           {mode === 'register' && (
-            <Field placeholder="你的名字" k="name" />
+            <input
+              type="text"
+              placeholder="你的名字"
+              value={form.name}
+              onChange={set('name')}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              style={inp}
+              onFocus={e => (e.target.style.borderColor = '#5b5fc7')}
+              onBlur={e => (e.target.style.borderColor = '#e2e8f0')}
+            />
           )}
         </div>
 

@@ -85,8 +85,11 @@ export default function Landing() {
             transition: 'transform 0.12s, box-shadow 0.12s',
           }}
         >
-          開始記帳
+          免費試用 1 天
         </button>
+        <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 10, textAlign: 'center' }}>
+          無需註冊 · 無需信用卡
+        </div>
 
         {/* Login link */}
         <button

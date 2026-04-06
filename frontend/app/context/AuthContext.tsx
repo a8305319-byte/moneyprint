@@ -7,6 +7,9 @@ if (typeof window === 'undefined' && !process.env.NEXT_PUBLIC_API_URL) {
   console.warn('[錢跡] NEXT_PUBLIC_API_URL is not set');
 }
 
+// 試用期 24 小時
+const TRIAL_MS = 24 * 60 * 60 * 1000;
+
 interface User {
   id: string; email: string; name: string; mode: 'PERSONAL' | 'BUSINESS';
   companyName?: string; taxId?: string; phone?: string; invoiceQuota?: number;
@@ -17,6 +20,8 @@ interface AuthCtx {
   token: string | null;
   loading: boolean;
   demoMode: boolean;
+  trialExpired: boolean;
+  trialExpiresAt: number | null;
   apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { email: string; password: string; name: string }) => Promise<void>;
@@ -36,19 +41,59 @@ const DEMO_USER: User = {
   mode: 'PERSONAL',
 };
 
-// Demo state: starts empty. Friends record their own real transactions.
-// All data is in-memory and resets on page refresh — by design.
-const demoState = {
-  txCount: 0,
-  totalExpense: 0,
-  totalIncome: 0,
-  todayTxCount: 0,
-  todayTotalExpense: 0,
-  txs: [] as any[],
-};
-
 const CATEGORY_ICONS: Record<string, string> = {
   餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬', 通訊: '📱', 薪資: '💰', 其他: '📋',
+};
+
+// ── 初始示範資料（相對於「今天」往前推算，讓 demo 不空白）─────────────────────
+const _now = new Date();
+const _todayDay = _now.getDate();
+const _ym = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
+const _mkDate = (day: number) =>
+  `${_ym}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
+
+interface DemoTxTpl {
+  id: string; day: number; description: string;
+  amount: string; direction: 'DEBIT' | 'CREDIT';
+  category: { name: string; icon: string };
+}
+
+// 固定放在月初幾天，只有「< 今天」的才會帶入，避免跨月或未來日期問題
+const DEMO_TX_TEMPLATES: DemoTxTpl[] = [
+  { id: 'd-s-1', day: 1, description: '早餐',     amount: '65',    direction: 'DEBIT',  category: { name: '餐飲', icon: '🍱' } },
+  { id: 'd-s-2', day: 1, description: '搭捷運',   amount: '28',    direction: 'DEBIT',  category: { name: '交通', icon: '🚇' } },
+  { id: 'd-s-3', day: 2, description: '午餐便當', amount: '120',   direction: 'DEBIT',  category: { name: '餐飲', icon: '🍱' } },
+  { id: 'd-s-4', day: 3, description: '薪資入帳', amount: '42000', direction: 'CREDIT', category: { name: '薪資', icon: '💰' } },
+  { id: 'd-s-5', day: 3, description: '超市購物', amount: '580',   direction: 'DEBIT',  category: { name: '購物', icon: '🛍' } },
+  { id: 'd-s-6', day: 4, description: '電話費',   amount: '699',   direction: 'DEBIT',  category: { name: '通訊', icon: '📱' } },
+  { id: 'd-s-7', day: 4, description: '晚餐聚餐', amount: '350',   direction: 'DEBIT',  category: { name: '餐飲', icon: '🍱' } },
+  { id: 'd-s-8', day: 5, description: '計程車',   amount: '220',   direction: 'DEBIT',  category: { name: '交通', icon: '🚇' } },
+  { id: 'd-s-9', day: 5, description: '便利商店', amount: '85',    direction: 'DEBIT',  category: { name: '購物', icon: '🛍' } },
+];
+
+const _seedTxs = DEMO_TX_TEMPLATES
+  .filter(t => t.day < _todayDay)          // 只帶過去的日期
+  .map(t => ({
+    id: t.id,
+    txDate: _mkDate(t.day),
+    description: t.description,
+    amount: t.amount,
+    direction: t.direction,
+    status: 'DONE' as const,
+    category: t.category,
+  }));
+
+const _seedDebit  = _seedTxs.filter(t => t.direction === 'DEBIT');
+const _seedCredit = _seedTxs.filter(t => t.direction === 'CREDIT');
+
+// Demo state：帶入初始示範資料；新增/刪除仍在記憶體，刷新重置
+const demoState = {
+  txCount:           _seedTxs.length,
+  totalExpense:      _seedDebit.reduce((s, t)  => s + Number(t.amount), 0),
+  totalIncome:       _seedCredit.reduce((s, t) => s + Number(t.amount), 0),
+  todayTxCount:      0,
+  todayTotalExpense: 0,
+  txs: [..._seedTxs] as any[],
 };
 
 function mockRes(data: any): Response {
@@ -142,7 +187,6 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
   }
 
   if (path.endsWith('/reports/category-breakdown')) {
-    // Build from actual demo transactions
     const breakdown: Record<string, { totalAmount: number; txCount: number }> = {};
     const debitTxs = demoState.txs.filter(t => t.direction === 'DEBIT');
     const total = debitTxs.reduce((s, t) => s + Number(t.amount), 0);
@@ -163,7 +207,6 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
   }
 
   if (path.endsWith('/reports/monthly-trend')) {
-    // Show only current month with real data; historical months show 0
     return mockRes(
       Array.from({ length: 6 }, (_, i) => {
         const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (5 - i));
@@ -172,15 +215,14 @@ function mockApiFetch(url: string, opts: RequestInit = {}): Response {
         return {
           month,
           totalExpense: isCurrent ? demoState.totalExpense : 0,
-          totalIncome: isCurrent ? demoState.totalIncome : 0,
-          netFlow: isCurrent ? demoState.totalIncome - demoState.totalExpense : 0,
+          totalIncome:  isCurrent ? demoState.totalIncome  : 0,
+          netFlow:      isCurrent ? demoState.totalIncome - demoState.totalExpense : 0,
         };
       })
     );
   }
 
   if (path.endsWith('/ledger')) {
-    // Filter by month query param
     const qs = url.includes('?') ? url.split('?')[1] : '';
     const monthParam = new URLSearchParams(qs).get('month');
     const txs = monthParam
@@ -205,14 +247,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
+  const [trialExpired, setTrialExpired] = useState(false);
+  const [trialExpiresAt, setTrialExpiresAt] = useState<number | null>(null);
   const demoRef = useRef(false);
   const logoutRef = useRef<() => void>(() => {});
 
   const logout = useCallback(() => {
     localStorage.removeItem('mp_token');
     localStorage.removeItem('mp_demo');
+    localStorage.removeItem('mp_trial_start');
     demoRef.current = false;
     setDemoMode(false);
+    setTrialExpired(false);
+    setTrialExpiresAt(null);
     setToken(null);
     setUser(null);
   }, []);
@@ -222,6 +269,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const enterDemo = useCallback(() => {
     localStorage.removeItem('mp_token');
     localStorage.setItem('mp_demo', 'true');
+    // 第一次進入才記錄試用開始時間
+    if (!localStorage.getItem('mp_trial_start')) {
+      localStorage.setItem('mp_trial_start', String(Date.now()));
+    }
+    const start = parseInt(localStorage.getItem('mp_trial_start')!);
+    const expiresAt = start + TRIAL_MS;
+    setTrialExpiresAt(expiresAt);
+    setTrialExpired(Date.now() >= expiresAt);
     demoRef.current = true;
     setDemoMode(true);
     setUser(DEMO_USER);
@@ -249,6 +304,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDemoMode(true);
       setUser(DEMO_USER);
       setToken('demo');
+      // 試用期計算
+      let start = parseInt(localStorage.getItem('mp_trial_start') ?? '0');
+      if (!start) {
+        start = Date.now();
+        localStorage.setItem('mp_trial_start', String(start));
+      }
+      const expiresAt = start + TRIAL_MS;
+      setTrialExpiresAt(expiresAt);
+      setTrialExpired(Date.now() >= expiresAt);
       setLoading(false);
       return;
     }
@@ -275,8 +339,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message ?? '登入失敗');
     localStorage.removeItem('mp_demo');
+    localStorage.removeItem('mp_trial_start');
     demoRef.current = false;
     setDemoMode(false);
+    setTrialExpired(false);
+    setTrialExpiresAt(null);
     localStorage.setItem('mp_token', json.data.token);
     setToken(json.data.token);
     setUser(json.data.user);
@@ -291,8 +358,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const json = await res.json();
     if (!res.ok) throw new Error(json.message ?? '註冊失敗');
     localStorage.removeItem('mp_demo');
+    localStorage.removeItem('mp_trial_start');
     demoRef.current = false;
     setDemoMode(false);
+    setTrialExpired(false);
+    setTrialExpiresAt(null);
     localStorage.setItem('mp_token', json.data.token);
     setToken(json.data.token);
     setUser(json.data.user);
@@ -312,7 +382,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, demoMode, apiFetch, login, register, logout, enterDemo, switchMode, updateProfile, refetch }}>
+    <AuthContext.Provider value={{
+      user, token, loading, demoMode,
+      trialExpired, trialExpiresAt,
+      apiFetch, login, register, logout, enterDemo,
+      switchMode, updateProfile, refetch,
+    }}>
       {children}
     </AuthContext.Provider>
   );
