@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBusinessInvoiceDto } from './dto/create-business-invoice.dto';
 import { Prisma } from '@prisma/client';
@@ -94,6 +94,7 @@ export class BusinessInvoicesService {
 
   async remove(userId: string, id: string) {
     const result = await this.prisma.businessInvoice.deleteMany({ where: { id, userId } });
+    if (result.count === 0) throw new NotFoundException('找不到此發票或無權刪除');
     return result;
   }
 }
