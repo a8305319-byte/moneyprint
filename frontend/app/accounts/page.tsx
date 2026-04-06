@@ -87,10 +87,10 @@ export default function AccountsPage() {
                 textTransform: 'uppercase', marginBottom: 10,
               }}>示範模式</div>
               <div style={{ color: '#fff', fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
-                資料不會儲存
+                資料僅存本機
               </div>
               <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 1.5 }}>
-                建立帳號，永久保存所有記錄
+                建立帳號，雲端同步不怕遺失
               </div>
             </div>
             <button onClick={doLogout} style={{
@@ -134,7 +134,7 @@ export default function AccountsPage() {
               建立帳號，資料永久保存
             </div>
             <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
-              示範模式的記錄在刷新後會消失。<br />建立免費帳號，所有記錄雲端同步。
+              示範模式的記錄僅存在本裝置瀏覽器。<br />建立免費帳號，所有記錄雲端同步、跨裝置存取。
             </div>
             <Link href="/login" style={{
               display: 'block', textAlign: 'center',
