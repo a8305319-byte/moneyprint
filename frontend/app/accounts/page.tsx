@@ -227,58 +227,27 @@ export default function AccountsPage() {
           ))}
         </div>
 
-        {/* Bank upload */}
+        {/* Bank upload — 功能尚未開放 */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', marginBottom: 4 }}>匯入對帳單</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>從網路銀行匯出 CSV 或 XLSX，上傳後自動整理</div>
-
-          <label style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>匯入對帳單</div>
+            <span style={{ fontSize: 10, background: '#f1f5f9', color: '#94a3b8', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>尚未開放</span>
+          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>此功能正在開發中，暫不開放使用</div>
+          <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            border: `2px dashed ${selectedFile ? '#5b5fc7' : '#e2e8f0'}`,
-            borderRadius: 16, padding: '32px 20px', cursor: 'pointer',
-            background: selectedFile ? '#eff2ff' : '#f8fafc', marginBottom: 12,
-            transition: 'all 0.2s',
+            border: '2px dashed #e2e8f0', borderRadius: 16, padding: '32px 20px',
+            background: '#f8fafc', opacity: 0.5,
           }}>
-            <input ref={fileRef} type="file" accept=".csv,.xlsx" style={{ display: 'none' }}
-              onChange={e => { setSelectedFile(e.target.files?.[0] ?? null); setUploadOk(false); setUploadError(''); }} />
-            <div style={{ fontSize: 28, marginBottom: 8 }}>{selectedFile ? '📄' : '📂'}</div>
-            <div style={{ fontSize: 14, color: selectedFile ? '#5b5fc7' : '#64748b', fontWeight: 600, textAlign: 'center' }}>
-              {selectedFile ? selectedFile.name : '點擊選取檔案'}
-            </div>
-            {!selectedFile && <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}>CSV · XLSX</div>}
-          </label>
-
-          <button
-            onClick={upload}
-            disabled={uploading || !selectedFile}
-            style={{
-              width: '100%',
-              background: !selectedFile ? '#f1f5f9' : 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
-              border: 'none', borderRadius: 14,
-              color: !selectedFile ? '#94a3b8' : '#fff',
-              fontWeight: 700, fontSize: 15, padding: '15px',
-              cursor: !selectedFile ? 'default' : 'pointer',
-              boxShadow: !selectedFile ? 'none' : '0 6px 20px rgba(91,95,199,0.35)',
-            }}
-          >
-            {uploading ? (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                匯入中
-              </span>
-            ) : '匯入'}
-          </button>
-
-          {uploadError && (
-            <div style={{ marginTop: 10, background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 10, padding: '10px 14px', color: '#e11d48', fontSize: 13 }}>
-              {uploadError}
-            </div>
-          )}
-          {uploadOk && (
-            <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px', color: '#059669', fontSize: 14, fontWeight: 600, textAlign: 'center' }}>
-              完成！共匯入 {uploadCount} 筆記錄
-            </div>
-          )}
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
+            <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>CSV · XLSX</div>
+          </div>
+          <button disabled style={{
+            width: '100%', marginTop: 12,
+            background: '#f1f5f9', border: 'none', borderRadius: 14,
+            color: '#94a3b8', fontWeight: 700, fontSize: 15, padding: '15px',
+            cursor: 'not-allowed',
+          }}>功能開發中，暫不開放</button>
         </div>
       </div>
     </div>

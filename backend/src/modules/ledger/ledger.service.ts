@@ -91,11 +91,9 @@ export class LedgerService {
     const todayExpense = todayTxs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
 
     return {
-      data: {
-        transaction: tx,
-        todaySummary:  { totalExpense: todayExpense, txCount: todayTxs.length },
-        monthSummary:  { totalExpense: monthExpense, txCount: monthTxs.length },
-      },
+      transaction: tx,
+      todaySummary:  { totalExpense: todayExpense, txCount: todayTxs.length },
+      monthSummary:  { totalExpense: monthExpense, txCount: monthTxs.length },
     };
   }
 

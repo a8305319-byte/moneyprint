@@ -81,9 +81,12 @@ export default function AppPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      setResult(json.data);
-      if (json.data?.todaySummary) setTodayStats(json.data.todaySummary);
+      if (!res.ok) throw new Error(json.message ?? json.data?.message);
+      // LedgerService.create() pre-wraps as { data:{...} }; TransformInterceptor
+      // wraps again → { data:{ data:{...} } }. Handle both cases defensively.
+      const resultData = json.data?.data ?? json.data;
+      setResult(resultData);
+      if (resultData?.todaySummary) setTodayStats(resultData.todaySummary);
       setPhase('done');
     } catch {
       setPhase('error');
