@@ -2,17 +2,18 @@ import {
   Controller, Post, Get, Query, Body,
   UseGuards, Request, HttpCode,
 } from '@nestjs/common';
+import { IsString, IsNotEmpty, IsArray, ArrayNotEmpty } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InvoicesService } from './invoices.service';
 
 class SyncCarrierDto {
-  cardNo!:       string;   // /XXXXXXX 手機條碼
-  cardEncrypt!:  string;   // 驗證碼（不落地，僅本次使用）
-  months!:       string[]; // ['2026-04', '2026-03']
+  @IsString() @IsNotEmpty() cardNo!:       string;
+  @IsString() @IsNotEmpty() cardEncrypt!:  string;
+  @IsArray()  @ArrayNotEmpty() months!:    string[];
 }
 
 class SaveBindingDto {
-  cardNo!: string;
+  @IsString() @IsNotEmpty() cardNo!: string;
 }
 
 @Controller('invoices')
