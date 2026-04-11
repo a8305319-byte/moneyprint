@@ -265,10 +265,12 @@ export class LedgerService {
           else if (credit > 0) { amount = credit; direction = 'CREDIT'; }
           else { failed++; continue; }
         } else if (amtCol >= 0) {
-          const raw = parseAmount(fields[amtCol] ?? '');
+          const rawStr = (fields[amtCol] ?? '').trim();
+          const isNeg = rawStr.startsWith('-') || (rawStr.startsWith('(') && rawStr.endsWith(')'));
+          const raw = parseAmount(rawStr);
           if (raw === 0) { failed++; continue; }
-          amount    = Math.abs(raw);
-          direction = raw < 0 ? 'DEBIT' : 'CREDIT';
+          amount    = raw;
+          direction = isNeg ? 'DEBIT' : 'CREDIT';
         } else if (debitCol >= 0) {
           amount    = parseAmount(fields[debitCol] ?? '');
           direction = 'DEBIT';
