@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useAuthGuard } from '../hooks/useAuthGuard';
@@ -27,9 +27,12 @@ function formatGroupDate(txDate: string): string {
   return d.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'short' });
 }
 
+type ImportState = 'idle' | 'uploading' | 'done' | 'error';
+interface ImportResult { imported: number; duplicated: number; failed: number; }
+
 export default function LedgerPage() {
   useAuthGuard();
-  const { apiFetch } = useAuth();
+  const { apiFetch, demoMode } = useAuth();
   const router = useRouter();
   const [txs, setTxs] = useState<LedgerTx[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,12 @@ export default function LedgerPage() {
   const [deleteTarget, setDeleteTarget] = useState<LedgerTx | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // CSV import state
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importState, setImportState] = useState<ImportState>('idle');
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -55,6 +64,44 @@ export default function LedgerPage() {
 
   const totalExp = txs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
   const totalInc = txs.filter(t => t.direction === 'CREDIT').reduce((s, t) => s + Number(t.amount), 0);
+
+  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (demoMode) {
+      setImportState('error');
+      setImportError('示範模式不支援 CSV 匯入，請建立帳號後使用');
+      return;
+    }
+
+    setImportState('uploading');
+    setImportError('');
+    setImportResult(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const r = await apiFetch('/ledger/import-bank-csv', { method: 'POST', body: form });
+      const j = await r.json();
+      if (!r.ok) {
+        setImportState('error');
+        setImportError(j.message ?? '匯入失敗');
+        return;
+      }
+      const d = j.data ?? j;
+      setImportResult({ imported: d.imported ?? 0, duplicated: d.duplicated ?? 0, failed: d.failed ?? 0 });
+      setImportState('done');
+      // reload list for current month
+      setLoading(true);
+      apiFetch(`/ledger?month=${month}`)
+        .then(r2 => r2.json()).then(d2 => setTxs(d2.data?.data ?? d2.data ?? []))
+        .catch(() => {}).finally(() => setLoading(false));
+    } catch {
+      setImportState('error');
+      setImportError('網路錯誤，請稍後再試');
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -114,6 +161,50 @@ export default function LedgerPage() {
       </div>
 
       <div style={{ padding: '16px 16px 32px' }}>
+
+        {/* ── 銀行 CSV 匯入卡片 ── */}
+        <div style={{ background: '#fff', borderRadius: 16, padding: '14px 16px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)', marginBottom: 16 }}>
+          <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleCsvUpload} />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>匯入銀行 CSV</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>支援中信、富邦、國泰 · UTF-8 / Big5</div>
+            </div>
+            <button
+              onClick={() => { setImportState('idle'); setImportResult(null); setImportError(''); fileRef.current?.click(); }}
+              disabled={importState === 'uploading'}
+              style={{
+                flexShrink: 0, padding: '8px 16px', borderRadius: 10, border: 'none',
+                background: importState === 'uploading' ? '#f1f5f9' : 'linear-gradient(135deg, #5b5fc7, #7c3aed)',
+                color: importState === 'uploading' ? '#94a3b8' : '#fff',
+                fontSize: 13, fontWeight: 700, cursor: importState === 'uploading' ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {importState === 'uploading' ? (
+                <>
+                  <div style={{ width: 13, height: 13, border: '2px solid rgba(148,163,184,0.3)', borderTopColor: '#94a3b8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  上傳中…
+                </>
+              ) : '📥 選擇檔案'}
+            </button>
+          </div>
+
+          {importState === 'done' && importResult && (
+            <div style={{ marginTop: 10, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#14532d', display: 'flex', gap: 16 }}>
+              <span>✅ 匯入 <strong>{importResult.imported}</strong> 筆</span>
+              <span>🔁 重複 <strong>{importResult.duplicated}</strong> 筆</span>
+              {importResult.failed > 0 && <span>❌ 失敗 <strong>{importResult.failed}</strong> 筆</span>}
+            </div>
+          )}
+          {importState === 'error' && importError && (
+            <div style={{ marginTop: 10, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#991b1b' }}>
+              ❌ {importError}
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(91,95,199,0.15)', borderTopColor: '#5b5fc7', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
