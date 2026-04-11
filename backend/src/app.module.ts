@@ -10,6 +10,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { BusinessInvoicesModule } from './modules/business-invoices/business-invoices.module';
 import { EinvoiceModule } from './modules/einvoice/einvoice.module';
+import { GmailModule } from './modules/gmail/gmail.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EinvoiceModule } from './modules/einvoice/einvoice.module';
     LedgerModule,
     BusinessInvoicesModule,
     EinvoiceModule,
+    GmailModule,
   ],
 })
 export class AppModule {}

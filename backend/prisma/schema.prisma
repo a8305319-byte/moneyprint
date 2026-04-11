@@ -71,6 +71,7 @@ enum AppMode {
 enum InvoiceSource {
   MOF_CARRIER   // 財政部手機條碼載具同步
   MANUAL        // 手動新增
+  EMAIL_IMPORT  // Gmail 電子發票通知信匯入
 }
 
 // ── Auth User ──────────────────────────────────────────
@@ -91,6 +92,7 @@ model AppUser {
   invoiceRecords   InvoiceRecord[]
   ledgerTransactions LedgerTransaction[]
   carrierBinding   CarrierBinding?
+  gmailBinding     GmailBinding?
 
   @@index([email])
 }
@@ -174,6 +176,22 @@ model CarrierBinding {
   lastSyncMonth String?                        // 上次同步月份 YYYY-MM
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ── Gmail 綁定（每 user 一筆，token 加密儲存）──────────────
+model GmailBinding {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  AppUser   @relation(fields: [userId], references: [id])
+  googleEmail           String
+  encryptedAccessToken  String
+  encryptedRefreshToken String
+  tokenExpiry           DateTime?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([userId])
 }
