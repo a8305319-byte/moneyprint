@@ -67,11 +67,11 @@ function parseAmount(s: string): number {
 }
 
 // ── 欄位標題偵測 ─────────────────────────────────────────────────────────────
-const DATE_HDRS  = ['日期','交易日期','記帳日期','交易日','入帳日','value date','date','交易時間'];
-const DEBIT_HDRS = ['支出','支出金額','借方金額','借方','debit','提款','扣款'];
-const CREDIT_HDRS= ['收入','收入金額','貸方金額','貸方','credit','存款','匯入'];
+const DATE_HDRS  = ['日期','交易日期','記帳日期','交易日','入帳日','value date','date','交易時間','消費日期'];
+const DEBIT_HDRS = ['支出','支出金額','借方金額','借方','debit','提款','扣款','提出金額','提出','支付金額','出帳','扣帳'];
+const CREDIT_HDRS= ['收入','收入金額','貸方金額','貸方','credit','存款','匯入','存入金額','存入','入帳金額','收款'];
 const AMT_HDRS   = ['金額','交易金額','amount','交易後餘額','本期金額'];
-const DESC_HDRS  = ['摘要','說明','備註','交易說明','項目','description','備忘','交易類型'];
+const DESC_HDRS  = ['摘要','說明','備註','交易說明','交易摘要','項目','description','備忘','交易類型','交易內容'];
 
 function findCol(headers: string[], candidates: string[]): number {
   for (let i = 0; i < headers.length; i++) {
@@ -108,10 +108,14 @@ function parseMonth(month?: string): { gte: Date; lt: Date } | undefined {
 export class LedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(userId: string, month?: string) {
+  async list(userId: string, month?: string, search?: string, direction?: string) {
     const txDate = parseMonth(month);
     const where: any = { userId };
     if (txDate) where.txDate = txDate;
+    if (direction === 'DEBIT' || direction === 'CREDIT') where.direction = direction;
+    if (search && search.trim()) {
+      where.description = { contains: search.trim(), mode: 'insensitive' };
+    }
     const data = await this.prisma.ledgerTransaction.findMany({
       where,
       include: { category: true },
@@ -190,6 +194,60 @@ export class LedgerService {
       todaySummary:  { totalExpense: todayExpense, txCount: todayTxs.length },
       monthSummary:  { totalExpense: monthExpense, txCount: monthTxs.length },
     };
+  }
+
+  // ── 編輯單筆交易 ──────────────────────────────────────────────────────────
+  async update(userId: string, id: string, body: {
+    description?: string;
+    amount?: number;
+    direction?: 'DEBIT' | 'CREDIT';
+    categoryName?: string;
+    txDate?: string;
+  }) {
+    const existing = await this.prisma.ledgerTransaction.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException('找不到此交易記錄');
+
+    const update: any = {};
+    if (body.description !== undefined) {
+      if (!body.description.trim()) throw new BadRequestException('說明不可為空');
+      update.description = body.description.trim();
+    }
+    if (body.amount !== undefined) {
+      if (body.amount <= 0) throw new BadRequestException('金額必須大於 0');
+      update.amount = body.amount;
+    }
+    if (body.direction !== undefined) update.direction = body.direction;
+    if (body.txDate !== undefined) update.txDate = new Date(body.txDate);
+
+    if (body.categoryName !== undefined) {
+      if (body.categoryName.trim()) {
+        const name = body.categoryName.trim();
+        const ICONS: Record<string, string> = {
+          餐飲: '🍱', 交通: '🚇', 購物: '🛍', 娛樂: '🎬',
+          通訊: '📱', 薪資: '💰', 其他: '📋',
+        };
+        let cat = await this.prisma.category.findFirst({ where: { userId, name } });
+        if (!cat) cat = await this.prisma.category.create({ data: { userId, name, icon: ICONS[name] ?? '📋' } });
+        update.categoryId = cat.id;
+      } else {
+        update.categoryId = null;
+      }
+    }
+
+    const tx = await this.prisma.ledgerTransaction.update({
+      where: { id },
+      data: update,
+      include: { category: true },
+    });
+    return { transaction: tx };
+  }
+
+  // ── 刪除單筆交易（owner check）──────────────────────────────────────────
+  async delete(userId: string, id: string) {
+    const existing = await this.prisma.ledgerTransaction.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException('找不到此交易記錄');
+    await this.prisma.ledgerTransaction.delete({ where: { id } });
+    return { data: { success: true } };
   }
 
   // ── 銀行 CSV 匯入 ─────────────────────────────────────────────────────────
@@ -313,11 +371,4 @@ export class LedgerService {
     return { success: true, imported, duplicated, failed };
   }
 
-  async delete(userId: string, id: string) {
-    const tx = await this.prisma.ledgerTransaction.findUnique({ where: { id } });
-    if (!tx) throw new NotFoundException('找不到此記錄');
-    if (tx.userId !== userId) throw new ForbiddenException('無權刪除此記錄');
-    await this.prisma.ledgerTransaction.delete({ where: { id } });
-    return { data: { success: true } };
-  }
 }

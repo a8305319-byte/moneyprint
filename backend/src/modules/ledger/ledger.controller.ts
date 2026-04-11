@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors, HttpCode, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors, HttpCode, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,8 +10,13 @@ export class LedgerController {
   constructor(private readonly svc: LedgerService) {}
 
   @Get()
-  list(@Request() req: any, @Query('month') month?: string) {
-    return this.svc.list(req.user.userId, month);
+  list(
+    @Request() req: any,
+    @Query('month') month?: string,
+    @Query('search') search?: string,
+    @Query('direction') direction?: string,
+  ) {
+    return this.svc.list(req.user.userId, month, search, direction);
   }
 
   @Post()
@@ -23,6 +28,17 @@ export class LedgerController {
     txDate?: string;
   }) {
     return this.svc.create(req.user.userId, body);
+  }
+
+  @Patch(':id')
+  update(@Request() req: any, @Param('id') id: string, @Body() body: {
+    description?: string;
+    amount?: number;
+    direction?: 'DEBIT' | 'CREDIT';
+    categoryName?: string;
+    txDate?: string;
+  }) {
+    return this.svc.update(req.user.userId, id, body);
   }
 
   @Delete(':id')

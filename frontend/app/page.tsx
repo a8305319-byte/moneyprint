@@ -68,8 +68,27 @@ export default function Landing() {
         {/* Tagline */}
         <div style={{
           color: 'rgba(255,255,255,0.35)', fontSize: 17,
-          marginBottom: 56, textAlign: 'center',
-        }}>記帳，就這麼簡單</div>
+          marginBottom: 32, textAlign: 'center',
+        }}>個人財務全自動整合</div>
+
+        {/* Feature chips */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 40 }}>
+          {[
+            { icon: '📧', text: 'Gmail 自動抓發票' },
+            { icon: '🏦', text: '銀行 CSV 匯入' },
+            { icon: '📊', text: '每月收支報表' },
+            { icon: '🧾', text: '電子發票管理' },
+            { icon: '🏛️', text: '統一發票對獎' },
+          ].map(f => (
+            <div key={f.text} style={{
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 20, padding: '6px 13px', fontSize: 12,
+              color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <span>{f.icon}</span><span>{f.text}</span>
+            </div>
+          ))}
+        </div>
 
         {/* Primary CTA */}
         <button
@@ -85,10 +104,10 @@ export default function Landing() {
             transition: 'transform 0.12s, box-shadow 0.12s',
           }}
         >
-          免費試用 1 天
+          免費試用
         </button>
         <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 10, textAlign: 'center' }}>
-          無需註冊 · 無需信用卡
+          無需註冊 · 無需信用卡 · Gmail 授權一次自動同步
         </div>
 
         {/* Login link */}

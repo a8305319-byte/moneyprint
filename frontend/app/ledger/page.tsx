@@ -41,6 +41,20 @@ export default function LedgerPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // Search / filter state (client-side)
+  const [search, setSearch] = useState('');
+  const [filterDir, setFilterDir] = useState<'' | 'DEBIT' | 'CREDIT'>('');
+
+  // Edit state
+  const [editTarget, setEditTarget] = useState<LedgerTx | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDir, setEditDir] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
+  const [editCategory, setEditCategory] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
   // CSV import state
   const fileRef = useRef<HTMLInputElement>(null);
   const [importState, setImportState] = useState<ImportState>('idle');
@@ -54,8 +68,19 @@ export default function LedgerPage() {
       .catch(() => setTxs([])).finally(() => setLoading(false));
   }, [month]);
 
+  // Filtered list (client-side search + direction)
+  const filtered = txs.filter(tx => {
+    if (filterDir && tx.direction !== filterDir) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      return tx.description.toLowerCase().includes(q)
+        || (tx.category?.name ?? '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
   // Group by date using timezone-safe parsing
-  const grouped = txs.reduce((acc, tx) => {
+  const grouped = filtered.reduce((acc, tx) => {
     const key = formatGroupDate(tx.txDate);
     if (!acc[key]) acc[key] = [];
     acc[key].push(tx);
@@ -64,6 +89,43 @@ export default function LedgerPage() {
 
   const totalExp = txs.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
   const totalInc = txs.filter(t => t.direction === 'CREDIT').reduce((s, t) => s + Number(t.amount), 0);
+
+  function openEdit(tx: LedgerTx) {
+    setEditTarget(tx);
+    setEditDesc(tx.description);
+    setEditAmount(String(Number(tx.amount)));
+    setEditDir(tx.direction);
+    setEditCategory(tx.category?.name ?? '');
+    setEditDate(tx.txDate.slice(0, 10));
+    setEditError('');
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return;
+    if (!editDesc.trim()) { setEditError('說明不可為空'); return; }
+    const amt = parseFloat(editAmount);
+    if (!amt || amt <= 0) { setEditError('金額必須大於 0'); return; }
+    setEditSaving(true); setEditError('');
+    try {
+      const r = await apiFetch(`/ledger/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: editDesc.trim(),
+          amount: amt,
+          direction: editDir,
+          categoryName: editCategory.trim() || undefined,
+          txDate: editDate,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) { setEditError(j.message ?? '儲存失敗'); return; }
+      const updated: LedgerTx = j.data?.transaction ?? j.data ?? j;
+      setTxs(prev => prev.map(t => t.id === editTarget.id ? { ...t, ...updated } : t));
+      setEditTarget(null);
+    } catch { setEditError('網路錯誤，請稍後再試'); }
+    finally { setEditSaving(false); }
+  }
 
   async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -169,7 +231,7 @@ export default function LedgerPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>匯入銀行 CSV</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>支援中信、富邦、國泰 · UTF-8 / Big5</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>支援中信、富邦、國泰、玉山、台新、永豐 · UTF-8 / Big5</div>
             </div>
             <button
               onClick={() => { setImportState('idle'); setImportResult(null); setImportError(''); fileRef.current?.click(); }}
@@ -205,6 +267,37 @@ export default function LedgerPage() {
           )}
         </div>
 
+        {/* ── 搜尋 + 篩選 ── */}
+        {!loading && txs.length > 0 && (
+          <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="搜尋說明或分類…"
+              style={{
+                flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 12,
+                padding: '10px 14px', fontSize: 14, background: '#fff',
+                outline: 'none', color: '#1e1b4b',
+                boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
+              }}
+            />
+            <button onClick={() => setFilterDir(filterDir === 'DEBIT' ? '' : 'DEBIT')} style={{
+              flexShrink: 0, padding: '0 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: filterDir === 'DEBIT' ? '#fff1f2' : '#fff',
+              color: filterDir === 'DEBIT' ? '#f43f5e' : '#64748b',
+              fontWeight: 700, fontSize: 13,
+              border: filterDir === 'DEBIT' ? '1.5px solid #fca5a5' : '1.5px solid #e2e8f0',
+            } as React.CSSProperties}>支出</button>
+            <button onClick={() => setFilterDir(filterDir === 'CREDIT' ? '' : 'CREDIT')} style={{
+              flexShrink: 0, padding: '0 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: filterDir === 'CREDIT' ? '#f0fdf4' : '#fff',
+              color: filterDir === 'CREDIT' ? '#10b981' : '#64748b',
+              fontWeight: 700, fontSize: 13,
+              border: filterDir === 'CREDIT' ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+            } as React.CSSProperties}>收入</button>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ display: 'inline-block', width: 32, height: 32, border: '3px solid rgba(91,95,199,0.15)', borderTopColor: '#5b5fc7', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
@@ -224,6 +317,10 @@ export default function LedgerPage() {
               }}
             >去記帳</button>
           </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8', fontSize: 14 }}>
+            沒有符合條件的記錄
+          </div>
         ) : Object.entries(grouped).map(([date, items]) => {
           const dayExp = items.filter(t => t.direction === 'DEBIT').reduce((s, t) => s + Number(t.amount), 0);
           return (
@@ -238,8 +335,10 @@ export default function LedgerPage() {
                   <div key={tx.id} className="tx-row" style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
                     borderBottom: i < items.length - 1 ? '1px solid #f1f5f9' : 'none',
-                    transition: 'background 0.1s',
-                  }}>
+                    transition: 'background 0.1s', cursor: 'pointer',
+                  }}
+                    onClick={() => openEdit(tx)}
+                  >
                     <div style={{
                       width: 40, height: 40, borderRadius: 13, flexShrink: 0,
                       background: tx.direction === 'DEBIT' ? '#fff1f2' : '#f0fdf4',
@@ -272,7 +371,7 @@ export default function LedgerPage() {
                     {/* Delete trigger */}
                     <button
                       className="del-btn"
-                      onClick={() => { setDeleteTarget(tx); setDeleteError(''); }}
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(tx); setDeleteError(''); }}
                       style={{
                         flexShrink: 0, background: 'none', border: 'none',
                         padding: '4px 2px', cursor: 'pointer', opacity: 0.35,
@@ -292,6 +391,93 @@ export default function LedgerPage() {
           );
         })}
       </div>
+
+      {/* ── Edit sheet ── */}
+      {editTarget && (
+        <>
+          <div onClick={() => setEditTarget(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 90, backdropFilter: 'blur(2px)' }}
+          />
+          <div style={{
+            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 480, background: '#fff',
+            borderRadius: '20px 20px 0 0',
+            padding: '20px 20px calc(24px + env(safe-area-inset-bottom))',
+            zIndex: 91, boxShadow: '0 -8px 40px rgba(15,23,42,0.15)',
+            animation: 'pop 0.2s ease both',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1e1b4b' }}>編輯記錄</div>
+              <button onClick={() => setEditTarget(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#94a3b8', padding: 4 }}>✕</button>
+            </div>
+
+            {/* Direction toggle */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {(['DEBIT', 'CREDIT'] as const).map(d => (
+                <button key={d} onClick={() => setEditDir(d)} style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer', border: 'none',
+                  background: editDir === d ? (d === 'DEBIT' ? '#fff1f2' : '#f0fdf4') : '#f8fafc',
+                  color: editDir === d ? (d === 'DEBIT' ? '#f43f5e' : '#10b981') : '#94a3b8',
+                  fontWeight: 700, fontSize: 13,
+                  outline: editDir === d ? `2px solid ${d === 'DEBIT' ? '#fca5a5' : '#86efac'}` : '2px solid transparent',
+                }}>{d === 'DEBIT' ? '支出' : '收入'}</button>
+              ))}
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 5, fontWeight: 600 }}>說明</div>
+              <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
+                style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '11px 14px', fontSize: 14, color: '#1e1b4b', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            {/* Amount + Date */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 5, fontWeight: 600 }}>金額</div>
+                <input value={editAmount} onChange={e => setEditAmount(e.target.value)} type="number" min="0"
+                  style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '11px 14px', fontSize: 14, color: '#1e1b4b', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 5, fontWeight: 600 }}>日期</div>
+                <input value={editDate} onChange={e => setEditDate(e.target.value)} type="date"
+                  style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '10px 12px', fontSize: 13, color: '#1e1b4b', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+            </div>
+
+            {/* Category */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 5, fontWeight: 600 }}>分類（可選）</div>
+              <input value={editCategory} onChange={e => setEditCategory(e.target.value)}
+                placeholder="餐飲 / 交通 / 購物…"
+                style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '11px 14px', fontSize: 14, color: '#1e1b4b', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            {editError && <div style={{ color: '#e11d48', fontSize: 13, marginBottom: 10, fontWeight: 600 }}>{editError}</div>}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => setEditTarget(null)}
+                style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px', color: '#64748b', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+                取消
+              </button>
+              <button onClick={saveEdit} disabled={editSaving}
+                style={{
+                  background: editSaving ? '#c7d2fe' : 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
+                  border: 'none', borderRadius: 14, padding: '14px', color: '#fff',
+                  fontSize: 15, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer',
+                  boxShadow: editSaving ? 'none' : '0 4px 16px rgba(91,95,199,0.35)',
+                }}>
+                {editSaving ? '儲存中…' : '儲存'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Delete confirmation sheet */}
       {deleteTarget && (
