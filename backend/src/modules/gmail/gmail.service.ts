@@ -1,5 +1,6 @@
 import {
   Injectable, BadRequestException, NotFoundException, ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -84,11 +85,12 @@ export class GmailService {
 
   // ── Build OAuth2 client ───────────────────────────────────────────────────
   private makeOAuth2(accessToken?: string, refreshToken?: string, expiry?: number | null) {
-    const client = new google.auth.OAuth2(
-      this.config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
-      this.config.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
-      this.callbackUrl,
-    );
+    const clientId     = this.config.get<string>('GOOGLE_CLIENT_ID',     '');
+    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET', '');
+    if (!clientId || !clientSecret) {
+      throw new ServiceUnavailableException('Gmail 功能尚未設定，請聯繫管理員（需設定 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET）');
+    }
+    const client = new google.auth.OAuth2(clientId, clientSecret, this.callbackUrl);
     if (accessToken) {
       client.setCredentials({
         access_token: accessToken,

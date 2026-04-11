@@ -227,27 +227,23 @@ export default function AccountsPage() {
           ))}
         </div>
 
-        {/* Bank upload — 功能尚未開放 */}
+        {/* Bank CSV import — live, redirect to ledger page */}
         <div style={{ background: '#fff', borderRadius: 20, padding: '20px', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>匯入對帳單</div>
-            <span style={{ fontSize: 10, background: '#f1f5f9', color: '#94a3b8', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>尚未開放</span>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>匯入銀行對帳單</div>
+            <span style={{ fontSize: 10, background: '#ecfdf5', color: '#059669', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>已開放</span>
           </div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>此功能正在開發中，暫不開放使用</div>
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            border: '2px dashed #e2e8f0', borderRadius: 16, padding: '32px 20px',
-            background: '#f8fafc', opacity: 0.5,
-          }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
-            <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>CSV · XLSX</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+            支援中信、富邦、國泰、玉山、台新、永豐 · CSV / UTF-8 / Big5 自動偵測
           </div>
-          <button disabled style={{
-            width: '100%', marginTop: 12,
-            background: '#f1f5f9', border: 'none', borderRadius: 14,
-            color: '#94a3b8', fontWeight: 700, fontSize: 15, padding: '15px',
-            cursor: 'not-allowed',
-          }}>功能開發中，暫不開放</button>
+          <button
+            onClick={() => router.push('/ledger')}
+            style={{
+              width: '100%', background: 'linear-gradient(135deg, #5b5fc7 0%, #7c3aed 100%)',
+              border: 'none', borderRadius: 14, color: '#fff',
+              fontWeight: 700, fontSize: 15, padding: '15px', cursor: 'pointer',
+            }}
+          >前往帳本匯入 →</button>
         </div>
       </div>
     </div>
