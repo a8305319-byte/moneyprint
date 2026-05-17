@@ -1,0 +1,470 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum Role {
+  BOSS          // 老闆/會計師
+  MANAGER       // 主管
+  SENIOR_ACCT   // 資深會計
+  ACCT          // 一般會計
+  ASSISTANT     // 助理
+  INTERN        // 工讀生
+  READONLY      // 唯讀人員
+  ADMIN         // 系統管理員
+}
+
+enum CaseStatus {
+  CREATED        // 已建立
+  ASSIGNED       // 已指派
+  WAITING_DATA   // 等待資料
+  DATA_RECEIVED  // 已收資料
+  IN_PROGRESS    // 處理中
+  PENDING_REVIEW // 送主管覆核
+  REJECTED       // 退回修改
+  PENDING_FILING // 待申報
+  FILED          // 已申報
+  ARCHIVED       // 歸檔
+  CLOSED         // 結案
+}
+
+enum CaseType {
+  MONTHLY_TAX       // 每月稅務
+  ANNUAL_TAX        // 年度申報
+  CUSTOMS_TAX       // 海關代徵營業稅
+  PAYROLL           // 薪資處理
+  BOOKKEEPING       // 記帳
+  AUDIT             // 查核
+  OTHER             // 其他
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum DocumentCategory {
+  RECEIPT       // 收據憑證
+  INVOICE       // 發票
+  CONTRACT      // 合約
+  REPORT        // 報表
+  FILING        // 申報書
+  PAYROLL       // 薪資相關
+  OTHER         // 其他
+}
+
+enum FilingStatus {
+  PENDING       // 待申報
+  SUBMITTED     // 已申報
+  ACCEPTED      // 已受理
+  REJECTED      // 退件
+  AMENDED       // 補正
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum NotificationType {
+  CASE_OVERDUE      // 案件逾期
+  CASE_STUCK        // 案件卡住
+  REVIEW_REQUEST    // 送審通知
+  TASK_ASSIGNED     // 任務指派
+  DOCUMENT_UPLOAD   // 文件上傳
+  SYSTEM            // 系統通知
+}
+
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  UPLOAD
+  DOWNLOAD
+  PRINT
+  EXPORT
+  IMPORT
+  REVIEW
+  REJECT
+  APPROVE
+  ASSIGN
+  TRANSFER
+}
+
+// ── 員工（使用者）──────────────────────────────────────
+
+model Employee {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  name            String
+  role            Role      @default(ACCT)
+  phone           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  lastModifiedBy  String?
+
+  assignedCases   Case[]           @relation("AssignedTo")
+  createdCases    Case[]           @relation("CreatedBy")
+  tasks           Task[]           @relation("TaskAssignee")
+  createdTasks    Task[]           @relation("TaskCreator")
+  reviews         CaseReview[]
+  caseComments    CaseComment[]
+  documents       Document[]
+  notifications   Notification[]
+  loginLogs       LoginLog[]
+  opLogs          OperationLog[]
+  salaries        Salary[]
+  handoversFrom   Handover[]       @relation("HandoverFrom")
+  handoversTo     Handover[]       @relation("HandoverTo")
+  clientAssigns   ClientEmployee[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+// ── 客戶 ────────────────────────────────────────────────
+
+model Client {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  name            String
+  taxId           String?
+  phone           String?
+  address         String?
+  contactPerson   String?
+  contactPhone    String?
+  contactEmail    String?
+  note            String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  lastModifiedBy  String?
+  lastModifiedAt  DateTime?
+
+  cases           Case[]
+  documents       Document[]
+  contracts       Contract[]
+  payments        Payment[]
+  employees       ClientEmployee[]
+
+  @@index([name])
+  @@index([taxId])
+  @@index([isActive])
+}
+
+model ClientEmployee {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  isPrimary   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([clientId, employeeId])
+}
+
+// ── 案件 ────────────────────────────────────────────────
+
+model Case {
+  id              String      @id @default(cuid())
+  caseNo          String      @unique
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id])
+  type            CaseType
+  status          CaseStatus  @default(CREATED)
+  title           String
+  description     String?
+  yearMonth       String?     // YYYY-MM，每月稅務用
+  dueDate         DateTime?
+  assigneeId      String?
+  assignee        Employee?   @relation("AssignedTo", fields: [assigneeId], references: [id])
+  createdById     String
+  createdBy       Employee    @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+  lastModifiedBy  String?
+  lastModifiedAt  DateTime?
+  isStuck         Boolean     @default(false)
+  stuckAt         DateTime?
+  archivedAt      DateTime?
+  closedAt        DateTime?
+
+  reviews         CaseReview[]
+  comments        CaseComment[]
+  documents       Document[]
+  tasks           Task[]
+  filings         TaxFiling[]
+  handovers       Handover[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([yearMonth])
+  @@index([dueDate])
+  @@index([assigneeId])
+}
+
+model CaseReview {
+  id          String    @id @default(cuid())
+  caseId      String
+  case        Case      @relation(fields: [caseId], references: [id])
+  reviewerId  String
+  reviewer    Employee  @relation(fields: [reviewerId], references: [id])
+  action      String    // APPROVE | REJECT
+  comment     String?
+  createdAt   DateTime  @default(now())
+
+  @@index([caseId])
+}
+
+model CaseComment {
+  id          String    @id @default(cuid())
+  caseId      String
+  case        Case      @relation(fields: [caseId], references: [id])
+  authorId    String
+  author      Employee  @relation(fields: [authorId], references: [id])
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([caseId])
+}
+
+// ── 文件 ────────────────────────────────────────────────
+
+model Document {
+  id              String           @id @default(cuid())
+  clientId        String?
+  client          Client?          @relation(fields: [clientId], references: [id])
+  caseId          String?
+  case            Case?            @relation(fields: [caseId], references: [id])
+  category        DocumentCategory @default(OTHER)
+  name            String
+  originalName    String
+  mimeType        String
+  size            Int
+  storagePath     String
+  version         Int              @default(1)
+  note            String?
+  uploadedById    String
+  uploadedBy      Employee         @relation(fields: [uploadedById], references: [id])
+  createdAt       DateTime         @default(now())
+  deletedAt       DateTime?
+  lastModifiedBy  String?
+
+  @@index([clientId])
+  @@index([caseId])
+  @@index([category])
+}
+
+// ── 任務 ────────────────────────────────────────────────
+
+model Task {
+  id            String      @id @default(cuid())
+  caseId        String?
+  case          Case?       @relation(fields: [caseId], references: [id])
+  title         String
+  description   String?
+  status        TaskStatus  @default(PENDING)
+  assigneeId    String?
+  assignee      Employee?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById   String
+  createdBy     Employee    @relation("TaskCreator", fields: [createdById], references: [id])
+  dueDate       DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  @@index([caseId])
+  @@index([assigneeId])
+  @@index([status])
+}
+
+// ── 稅務申報 ──────────────────────────────────────────
+
+model TaxFiling {
+  id              String        @id @default(cuid())
+  caseId          String
+  case            Case          @relation(fields: [caseId], references: [id])
+  clientId        String
+  type            String        // 稅別
+  yearMonth       String        // YYYY-MM
+  status          FilingStatus  @default(PENDING)
+  filedAt         DateTime?
+  acceptedAt      DateTime?
+  taxAmount       Decimal?      @db.Decimal(14, 2)
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastModifiedBy  String?
+
+  @@index([caseId])
+  @@index([yearMonth])
+  @@index([status])
+}
+
+// ── 合約與收款 ────────────────────────────────────────
+
+model Contract {
+  id              String         @id @default(cuid())
+  clientId        String
+  client          Client         @relation(fields: [clientId], references: [id])
+  title           String
+  startDate       DateTime
+  endDate         DateTime?
+  monthlyFee      Decimal        @db.Decimal(12, 2)
+  status          ContractStatus @default(ACTIVE)
+  note            String?
+  documentPath    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+  lastModifiedBy  String?
+
+  payments        Payment[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+  contractId      String?
+  contract        Contract?     @relation(fields: [contractId], references: [id])
+  yearMonth       String
+  amount          Decimal       @db.Decimal(12, 2)
+  status          PaymentStatus @default(UNPAID)
+  paidAt          DateTime?
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastModifiedBy  String?
+
+  @@index([clientId])
+  @@index([yearMonth])
+  @@index([status])
+}
+
+// ── 薪資 ──────────────────────────────────────────────
+
+model Salary {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  yearMonth       String    // YYYY-MM
+  baseSalary      Decimal   @db.Decimal(12, 2)
+  overtime        Decimal   @db.Decimal(12, 2) @default(0)
+  bonus           Decimal   @db.Decimal(12, 2) @default(0)
+  deductLeave     Decimal   @db.Decimal(12, 2) @default(0)
+  deductLabor     Decimal   @db.Decimal(12, 2) @default(0)
+  deductHealth    Decimal   @db.Decimal(12, 2) @default(0)
+  deductPension   Decimal   @db.Decimal(12, 2) @default(0)
+  netSalary       Decimal   @db.Decimal(12, 2)
+  paidAt          DateTime?
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastModifiedBy  String?
+
+  @@unique([employeeId, yearMonth])
+  @@index([yearMonth])
+}
+
+// ── 通知 ──────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(cuid())
+  employeeId  String
+  employee    Employee         @relation(fields: [employeeId], references: [id])
+  type        NotificationType
+  title       String
+  content     String
+  isRead      Boolean          @default(false)
+  link        String?
+  createdAt   DateTime         @default(now())
+
+  @@index([employeeId])
+  @@index([isRead])
+}
+
+// ── 交接 ──────────────────────────────────────────────
+
+model Handover {
+  id            String    @id @default(cuid())
+  caseId        String?
+  case          Case?     @relation(fields: [caseId], references: [id])
+  fromId        String
+  from          Employee  @relation("HandoverFrom", fields: [fromId], references: [id])
+  toId          String
+  to            Employee  @relation("HandoverTo", fields: [toId], references: [id])
+  note          String?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([caseId])
+  @@index([fromId])
+  @@index([toId])
+}
+
+// ── 操作記錄 ──────────────────────────────────────────
+
+model OperationLog {
+  id           String     @id @default(cuid())
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  action       ActionType
+  targetType   String     // Case | Client | Document | Task | ...
+  targetId     String?
+  targetName   String?
+  detail       Json?
+  ipAddress    String?
+  createdAt    DateTime   @default(now())
+
+  @@index([employeeId])
+  @@index([action])
+  @@index([targetType])
+  @@index([createdAt])
+}
+
+// ── 登入記錄 ──────────────────────────────────────────
+
+model LoginLog {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  ipAddress   String?
+  userAgent   String?
+  success     Boolean
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId])
+  @@index([createdAt])
+}
