@@ -1,36 +1,37 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api, getUser } from '@/lib/api';
 
-const payments = [
-  { id: 'P001', client: '宏達貿易', clientId: 'C001', month: '2026-05', amount: 8000, status: '已收款', dueDate: '2026-05-10', paidAt: '2026-05-05', method: '匯款', note: '' },
-  { id: 'P002', client: '新光物流', clientId: 'C002', month: '2026-05', amount: 5000, status: '未收款', dueDate: '2026-05-10', paidAt: null, method: '', note: '已電話催款一次' },
-  { id: 'P003', client: '全台科技', clientId: 'C003', month: '2026-05', amount: 7500, status: '已收款', dueDate: '2026-05-10', paidAt: '2026-05-08', method: '匯款', note: '' },
-  { id: 'P004', client: '信義建設', clientId: 'C004', month: '2026-05', amount: 12000, status: '未收款', dueDate: '2026-05-10', paidAt: null, method: '', note: '' },
-  { id: 'P005', client: '松山食品', clientId: 'C005', month: '2026-05', amount: 6000, status: '已收款', dueDate: '2026-05-10', paidAt: '2026-05-03', method: '現金', note: '' },
-  { id: 'P006', client: '大安診所', clientId: 'C006', month: '2026-05', amount: 9000, status: '已收款', dueDate: '2026-05-10', paidAt: '2026-05-07', method: '匯款', note: '' },
-  { id: 'P007', client: '宏達貿易', clientId: 'C001', month: '2026-04', amount: 8000, status: '已收款', dueDate: '2026-04-10', paidAt: '2026-04-07', method: '匯款', note: '' },
-  { id: 'P008', client: '新光物流', clientId: 'C002', month: '2026-04', amount: 5000, status: '已收款', dueDate: '2026-04-10', paidAt: '2026-04-12', method: '匯款', note: '遲繳2天' },
-  { id: 'P009', client: '宏達貿易', clientId: 'C001', month: '2026-02', amount: 8000, status: '逾期未收', dueDate: '2026-02-10', paidAt: null, method: '', note: '已多次催款' },
-];
-
-const MONTHS = ['全部', '2026-05', '2026-04', '2026-03', '2026-02'];
-const STATUSES = ['全部', '已收款', '未收款', '逾期未收'];
 const STATUS_COLORS: Record<string, string> = {
   已收款: 'bg-green-100 text-green-800',
   未收款: 'bg-yellow-100 text-yellow-800',
   逾期未收: 'bg-red-100 text-red-800',
 };
 
+const STATUSES = ['全部', '已收款', '未收款', '逾期未收'];
+
 export default function PaymentsPage() {
-  const [filterMonth, setFilterMonth] = useState('2026-05');
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [filterMonth, setFilterMonth] = useState('全部');
   const [filterStatus, setFilterStatus] = useState('全部');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    api.get('/payments')
+      .then((res) => setPayments(res.data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const months = ['全部', ...Array.from(new Set(payments.map((p) => p.month))).sort((a, b) => b.localeCompare(a))];
 
   const filtered = payments.filter((p) => {
     const matchMonth = filterMonth === '全部' || p.month === filterMonth;
     const matchStatus = filterStatus === '全部' || p.status === filterStatus;
-    const matchSearch = p.client.includes(search) || p.id.includes(search);
+    const matchSearch = p.clientName?.includes(search) || p.id.includes(search);
     return matchMonth && matchStatus && matchSearch;
   });
 
@@ -39,13 +40,18 @@ export default function PaymentsPage() {
   const receivedCount = filtered.filter((p) => p.status === '已收款').length;
   const unpaidCount = filtered.filter((p) => p.status !== '已收款').length;
 
+  const handleMarkPaid = (id: string) => {
+    const user = getUser();
+    api.patch(`/payments/${id}/paid`, { method: '匯款', lastModifiedBy: user?.name ?? '' }).then((res) => {
+      setPayments((prev) => prev.map((p) => p.id === id ? res.data : p));
+    });
+  };
+
   return (
     <main className="space-y-5 text-base">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">收款管理</h1>
-        <div className="flex gap-3">
-          <button className="rounded bg-green-600 px-5 py-3 text-white font-semibold hover:bg-green-700">匯出報表</button>
-        </div>
+        <button className="rounded bg-green-600 px-5 py-3 text-white font-semibold hover:bg-green-700" onClick={() => window.print()}>匯出報表</button>
       </div>
 
       {/* 統計 */}
@@ -81,14 +87,18 @@ export default function PaymentsPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <select className="rounded border px-4 py-3 text-base" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
-          {MONTHS.map((m) => <option key={m}>{m}</option>)}
+          {months.map((m) => <option key={m}>{m}</option>)}
         </select>
         <select className="rounded border px-4 py-3 text-base" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => window.print()}>列印</button>
-        <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => { setSearch(''); setFilterMonth('2026-05'); setFilterStatus('全部'); }}>清除篩選</button>
+        <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => { setSearch(''); setFilterMonth('全部'); setFilterStatus('全部'); }}>清除篩選</button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">無法載入收款：{error}</div>
+      )}
 
       {/* 收款表格 */}
       <div className="rounded-lg border bg-white overflow-hidden">
@@ -108,14 +118,15 @@ export default function PaymentsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && <tr><td colSpan={10} className="p-8 text-center text-slate-400">載入中…</td></tr>}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={10} className="p-8 text-center text-slate-400">無符合條件的收款記錄</td></tr>
             )}
             {filtered.map((p) => (
               <tr key={p.id} className={`border-t hover:bg-slate-50 ${p.status === '逾期未收' ? 'bg-red-50' : p.status === '未收款' ? 'bg-yellow-50' : ''}`}>
                 <td className="px-4 py-3 font-mono text-sm text-slate-500">{p.id}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/clients/${p.clientId}`} className="font-medium text-blue-600 hover:underline">{p.client}</Link>
+                  <Link href={`/clients/${p.clientId}`} className="font-medium text-blue-600 hover:underline">{p.clientName}</Link>
                 </td>
                 <td className="px-4 py-3">{p.month}</td>
                 <td className="px-4 py-3 text-right font-semibold">NT$ {p.amount.toLocaleString()}</td>
@@ -130,9 +141,14 @@ export default function PaymentsPage() {
                 </td>
                 <td className="px-4 py-3">
                   {p.status !== '已收款' ? (
-                    <button className="rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700">標記已收</button>
+                    <button
+                      className="rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                      onClick={() => handleMarkPaid(p.id)}
+                    >
+                      標記已收
+                    </button>
                   ) : (
-                    <button className="rounded bg-slate-200 px-3 py-2 text-sm hover:bg-slate-300">查看</button>
+                    <span className="text-slate-400 text-sm">已收</span>
                   )}
                 </td>
               </tr>

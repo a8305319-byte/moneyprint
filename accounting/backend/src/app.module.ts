@@ -13,6 +13,9 @@ import { SalaryModule } from './salary/salary.module';
 import { FilingsModule } from './filings/filings.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { PaymentsModule } from './payments/payments.module';
+import { DocumentsModule } from './documents/documents.module';
+import { HandoverModule } from './handover/handover.module';
+import { OperationLogsModule } from './operation-logs/operation-logs.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { PaymentsModule } from './payments/payments.module';
     FilingsModule,
     ContractsModule,
     PaymentsModule,
+    DocumentsModule,
+    HandoverModule,
+    OperationLogsModule,
   ],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 const ACTION_COLORS: Record<string, string> = {
   登入: 'bg-slate-100 text-slate-600',
@@ -12,33 +13,29 @@ const ACTION_COLORS: Record<string, string> = {
   送審: 'bg-yellow-100 text-yellow-700',
 };
 
-const logs = [
-  { id: 1, user: '陳美玲', role: '資深會計', action: '送審', target: '案件 A001（宏達貿易）', time: '2026-05-15 16:45', ip: '192.168.1.3' },
-  { id: 2, user: '林國棟', role: '老闆', action: '修改', target: '案件 A001 → 退回修改', time: '2026-05-16 11:20', ip: '192.168.1.1' },
-  { id: 3, user: '陳美玲', role: '資深會計', action: '上傳', target: '宏達貿易5月進項憑證彙整.xlsx', time: '2026-05-08 10:15', ip: '192.168.1.3' },
-  { id: 4, user: '王志明', role: '一般會計', action: '修改', target: '客戶 C002（新光物流）聯絡人資料', time: '2026-05-17 09:30', ip: '192.168.1.4' },
-  { id: 5, user: '林佳慧', role: '一般會計', action: '新增', target: '任務 T007（松山食品勞健保）', time: '2026-05-17 09:45', ip: '192.168.1.5' },
-  { id: 6, user: '張淑芬', role: '主任', action: '修改', target: '案件 A008 負責人 → 張淑芬', time: '2026-05-16 09:00', ip: '192.168.1.2' },
-  { id: 7, user: '陳美玲', role: '資深會計', action: '下載', target: '客戶對帳單5月.pdf', time: '2026-05-17 10:00', ip: '192.168.1.3' },
-  { id: 8, user: '吳俊宏', role: '實習生', action: '登入', target: '系統', time: '2026-05-17 08:30', ip: '192.168.1.8' },
-  { id: 9, user: '黃曉玲', role: '助理', action: '新增', target: '客戶 C004（信義建設）備注', time: '2026-05-16 14:30', ip: '192.168.1.7' },
-  { id: 10, user: '李建宏', role: '資深會計', action: '修改', target: '合約 CT004 金額 → NT$ 12,000', time: '2026-05-15 11:00', ip: '192.168.1.6' },
-  { id: 11, user: '林國棟', role: '老闆', action: '登出', target: '系統', time: '2026-05-16 18:30', ip: '192.168.1.1' },
-  { id: 12, user: '王志明', role: '一般會計', action: '刪除', target: '草稿案件 A011（草稿）', time: '2026-05-14 15:00', ip: '192.168.1.4' },
-];
-
-const USERS = ['全部', '陳美玲', '王志明', '林佳慧', '李建宏', '張淑芬', '林國棟', '黃曉玲', '吳俊宏'];
 const ACTIONS = ['全部', '登入', '新增', '修改', '刪除', '上傳', '下載', '送審', '登出'];
 
 export default function OperationLogsPage() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterUser, setFilterUser] = useState('全部');
   const [filterAction, setFilterAction] = useState('全部');
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+    api.get('/operation-logs')
+      .then((res) => setLogs(res.data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const users = ['全部', ...Array.from(new Set(logs.map((l) => l.user).filter(Boolean)))];
+
   const filtered = logs.filter((l) => {
     const matchUser = filterUser === '全部' || l.user === filterUser;
     const matchAction = filterAction === '全部' || l.action === filterAction;
-    const matchSearch = l.user.includes(search) || l.target.includes(search);
+    const matchSearch = l.user?.includes(search) || l.target?.includes(search);
     return matchUser && matchAction && matchSearch;
   });
 
@@ -49,7 +46,7 @@ export default function OperationLogsPage() {
           <h1 className="text-2xl font-bold">操作紀錄</h1>
           <p className="mt-1 text-sm text-slate-500">操作紀錄不可修改或刪除，僅限唯讀查閱</p>
         </div>
-        <button className="rounded bg-green-600 px-5 py-3 text-white font-semibold hover:bg-green-700">匯出 Excel</button>
+        <button className="rounded bg-green-600 px-5 py-3 text-white font-semibold hover:bg-green-700" onClick={() => window.print()}>匯出 Excel</button>
       </div>
 
       {/* 篩選 */}
@@ -61,7 +58,7 @@ export default function OperationLogsPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <select className="rounded border px-4 py-3 text-base" value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
-          {USERS.map((u) => <option key={u}>{u}</option>)}
+          {users.map((u) => <option key={u}>{u}</option>)}
         </select>
         <select className="rounded border px-4 py-3 text-base" value={filterAction} onChange={(e) => setFilterAction(e.target.value)}>
           {ACTIONS.map((a) => <option key={a}>{a}</option>)}
@@ -69,6 +66,10 @@ export default function OperationLogsPage() {
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => window.print()}>列印</button>
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => { setSearch(''); setFilterUser('全部'); setFilterAction('全部'); }}>清除篩選</button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">無法載入操作紀錄：{error}</div>
+      )}
 
       {/* 紀錄表格 */}
       <div className="rounded-lg border bg-white overflow-hidden">
@@ -84,7 +85,8 @@ export default function OperationLogsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && <tr><td colSpan={6} className="p-8 text-center text-slate-400">載入中…</td></tr>}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={6} className="p-8 text-center text-slate-400">無符合條件的操作紀錄</td></tr>
             )}
             {filtered.map((l) => (

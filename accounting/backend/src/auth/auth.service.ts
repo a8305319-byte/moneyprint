@@ -16,11 +16,11 @@ interface MockUser {
 @Injectable()
 export class AuthService {
   private readonly users: MockUser[] = [
-    { id: 'E001', name: '王老闆', email: 'boss@firm.com', password: 'password123', role: 'BOSS' },
-    { id: 'E002', name: '林主管', email: 'manager@firm.com', password: 'password123', role: 'MANAGER' },
-    { id: 'E003', name: '王小美', email: 'senior@firm.com', password: 'password123', role: 'SENIOR_ACCT' },
-    { id: 'E004', name: '陳大文', email: 'acct@firm.com', password: 'password123', role: 'ACCT' },
-    { id: 'E005', name: '李助理', email: 'assistant@firm.com', password: 'password123', role: 'ASSISTANT' },
+    { id: 'E001', name: '林國棟', email: 'boss@firm.com', password: 'password123', role: 'BOSS' },
+    { id: 'E002', name: '張淑芬', email: 'manager@firm.com', password: 'password123', role: 'MANAGER' },
+    { id: 'E003', name: '陳美玲', email: 'senior@firm.com', password: 'password123', role: 'SENIOR_ACCT' },
+    { id: 'E004', name: '王志明', email: 'acct@firm.com', password: 'password123', role: 'ACCT' },
+    { id: 'E005', name: '黃曉玲', email: 'assistant@firm.com', password: 'password123', role: 'ASSISTANT' },
   ];
 
   constructor(private readonly jwtService: JwtService) {}

@@ -1,16 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
-
-type Notification = {
-  id: number;
-  type: string;
-  title: string;
-  body: string;
-  caseId?: string;
-  time: string;
-  read: boolean;
-};
+import { useEffect, useState } from 'react';
+import { api, getUser } from '@/lib/api';
 
 const TYPE_COLORS: Record<string, string> = {
   逾期: 'bg-red-100 text-red-700',
@@ -22,25 +13,36 @@ const TYPE_COLORS: Record<string, string> = {
   收款: 'bg-teal-100 text-teal-700',
 };
 
-const initialNotifications: Notification[] = [
-  { id: 1, type: '逾期', title: '案件 A002 已逾期', body: '新光物流 2026-05 扣繳申報已超過截止日，請盡快處理。', caseId: 'A002', time: '2026-05-18 08:00', read: false },
-  { id: 2, type: '退回', title: '案件 A001 被主管退回', body: '林主任退回宏達貿易案件，退回原因：缺少進口報單。', caseId: 'A001', time: '2026-05-16 11:20', read: false },
-  { id: 3, type: '送審', title: '陳美玲送來案件 A009 待覆核', body: '全台科技 2026-05 扣繳申報已送審，請確認。', caseId: 'A009', time: '2026-05-17 14:00', read: false },
-  { id: 4, type: '指派', title: '新案件指派給您', body: '您被指派負責大安診所 2026-05 營業稅申報（案件 A008）。', caseId: 'A008', time: '2026-05-16 09:00', read: false },
-  { id: 5, type: '完成', title: '任務 T006 已完成', body: '陳美玲完成宏達貿易年度所得稅試算任務。', time: '2026-05-10 17:30', read: true },
-  { id: 6, type: '收款', title: '收款提醒：宏達貿易 2026-02', body: '宏達貿易 2026-02 月份帳款 NT$ 8,000 尚未收款，請聯絡客戶。', time: '2026-05-15 10:00', read: true },
-  { id: 7, type: '系統', title: '系統維護通知', body: '系統將於 2026-05-20 00:00–02:00 進行維護，期間無法使用。', time: '2026-05-14 09:00', read: true },
-];
-
 const TYPES = ['全部', '逾期', '退回', '送審', '指派', '完成', '收款', '系統'];
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterType, setFilterType] = useState('全部');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
-  const markAllRead = () => setNotifications(notifications.map((n) => ({ ...n, read: true })));
-  const markRead = (id: number) => setNotifications(notifications.map((n) => n.id === id ? { ...n, read: true } : n));
+  const user = getUser();
+
+  useEffect(() => {
+    const query = user ? `?recipientId=${user.id}` : '';
+    api.get(`/notifications${query}`)
+      .then((res) => setNotifications(res.data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const markRead = (id: string) => {
+    api.patch(`/notifications/${id}/read`, {}).then(() => {
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    });
+  };
+
+  const markAllRead = () => {
+    api.patch('/notifications/read-all', { recipientId: user?.id }).then(() => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    });
+  };
 
   const filtered = notifications.filter((n) => {
     const matchType = filterType === '全部' || n.type === filterType;
@@ -55,14 +57,14 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">通知提醒</h1>
-          {unreadCount > 0 && (
+          {!loading && unreadCount > 0 && (
             <p className="mt-1 text-red-600 font-medium">您有 {unreadCount} 則未讀通知</p>
           )}
         </div>
         <div className="flex gap-3">
           <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => window.print()}>列印</button>
           <button
-            className="rounded bg-blue-600 px-4 py-3 text-white font-semibold hover:bg-blue-700"
+            className="rounded bg-blue-600 px-4 py-3 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
             onClick={markAllRead}
             disabled={unreadCount === 0}
           >
@@ -91,9 +93,14 @@ export default function NotificationsPage() {
         >清除篩選</button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">無法載入通知：{error}</div>
+      )}
+
       {/* 通知列表 */}
       <div className="space-y-3">
-        {filtered.length === 0 && (
+        {loading && <div className="rounded-lg border bg-white p-8 text-center text-slate-400">載入中…</div>}
+        {!loading && filtered.length === 0 && (
           <div className="rounded-lg border bg-white p-8 text-center text-slate-400">沒有符合條件的通知</div>
         )}
         {filtered.map((n) => (
@@ -118,7 +125,7 @@ export default function NotificationsPage() {
                 )}
               </div>
               <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <span className="text-sm text-slate-400">{n.time}</span>
+                <span className="text-sm text-slate-400">{n.createdAt ?? n.time}</span>
                 {!n.read && (
                   <button
                     className="rounded bg-slate-200 px-3 py-1 text-sm hover:bg-slate-300"

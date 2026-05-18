@@ -1,35 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
-
-const reviews = [
-  {
-    id: 'R001', caseId: 'A001', client: '宏達貿易', type: '營業稅申報', month: '2026-05',
-    submitter: '陳美玲', submittedAt: '2026-05-15 16:45', status: '已退回',
-    reviewer: '林主任', reviewedAt: '2026-05-16 11:20',
-    rejectReason: '附件缺少5月份進口報單影本，請補齊後重新送審。',
-  },
-  {
-    id: 'R002', caseId: 'A002', client: '新光物流', type: '扣繳申報', month: '2026-05',
-    submitter: '王志明', submittedAt: '2026-05-17 10:15', status: '待覆核',
-    reviewer: '', reviewedAt: '', rejectReason: '',
-  },
-  {
-    id: 'R003', caseId: 'A009', client: '全台科技', type: '扣繳申報', month: '2026-05',
-    submitter: '陳美玲', submittedAt: '2026-05-17 14:00', status: '待覆核',
-    reviewer: '', reviewedAt: '', rejectReason: '',
-  },
-  {
-    id: 'R004', caseId: 'A004', client: '宏達貿易', type: '綜所稅申報', month: '2026-04',
-    submitter: '陳美玲', submittedAt: '2026-04-20 09:30', status: '已核准',
-    reviewer: '林主任', reviewedAt: '2026-04-20 16:00', rejectReason: '',
-  },
-  {
-    id: 'R005', caseId: 'A005', client: '信義建設', type: '營利事業所得稅', month: '2026-03',
-    submitter: '李建宏', submittedAt: '2026-03-25 11:00', status: '已核准',
-    reviewer: '林主任', reviewedAt: '2026-03-25 15:30', rejectReason: '',
-  },
-];
+import { useEffect, useState } from 'react';
+import { api, getUser } from '@/lib/api';
 
 const STATUS_COLORS: Record<string, string> = {
   待覆核: 'bg-yellow-100 text-yellow-800',
@@ -37,13 +9,50 @@ const STATUS_COLORS: Record<string, string> = {
   已退回: 'bg-red-100 text-red-800',
 };
 
-const STATUSES = ['全部', '待覆核', '已核准', '已退回'];
+const REVIEW_STATUS_MAP: Record<string, string> = {
+  送主管覆核: '待覆核',
+  退回修改: '已退回',
+  已申報: '已核准',
+  歸檔: '已核准',
+  結案: '已核准',
+};
+
+const REVIEW_STATUSES = ['全部', '待覆核', '已核准', '已退回'];
 
 export default function ReviewsPage() {
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('全部');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const user = getUser();
+
+  useEffect(() => {
+    api.get('/cases')
+      .then((res) => {
+        const reviewable = res.data.filter((c: any) => REVIEW_STATUS_MAP[c.status]);
+        setCases(reviewable);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const reviews = cases.map((c) => ({
+    caseId: c.id,
+    client: c.clientName,
+    type: c.type,
+    month: c.month,
+    submitter: c.owner,
+    submittedAt: c.timeline?.findLast?.((t: any) => t.action === '送主管覆核')?.at ?? c.createdAt,
+    status: REVIEW_STATUS_MAP[c.status] ?? '待覆核',
+    reviewer: c.lastModifiedBy,
+    reviewedAt: c.timeline?.findLast?.((t: any) => t.action === '退回修改' || t.action === '已申報')?.at ?? '',
+    rejectReason: c.rejectReason,
+  }));
 
   const filtered = reviews.filter((r) => {
     const matchStatus = filterStatus === '全部' || r.status === filterStatus;
@@ -55,7 +64,35 @@ export default function ReviewsPage() {
   const approved = reviews.filter((r) => r.status === '已核准').length;
   const rejected = reviews.filter((r) => r.status === '已退回').length;
 
-  const selected = reviews.find((r) => r.id === selectedId);
+  const handleApprove = async (caseId: string) => {
+    setSubmitting(true);
+    try {
+      await api.patch(`/cases/${caseId}/status`, {
+        status: '已申報',
+        lastModifiedBy: user?.name ?? '',
+      });
+      setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, status: '已申報', lastModifiedBy: user?.name } : c));
+      setSelectedId(null);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReject = async (caseId: string) => {
+    setSubmitting(true);
+    try {
+      await api.patch(`/cases/${caseId}/status`, {
+        status: '退回修改',
+        lastModifiedBy: user?.name ?? '',
+        rejectReason,
+      });
+      setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, status: '退回修改', rejectReason, lastModifiedBy: user?.name } : c));
+      setSelectedId(null);
+      setRejectReason('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <main className="space-y-5 text-base">
@@ -67,15 +104,15 @@ export default function ReviewsPage() {
       {/* 統計 */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-yellow-600">{pending}</p>
+          <p className="text-3xl font-bold text-yellow-600">{loading ? '…' : pending}</p>
           <p className="mt-1 text-slate-500">待覆核</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-green-600">{approved}</p>
+          <p className="text-3xl font-bold text-green-600">{loading ? '…' : approved}</p>
           <p className="mt-1 text-slate-500">已核准</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-red-600">{rejected}</p>
+          <p className="text-3xl font-bold text-red-600">{loading ? '…' : rejected}</p>
           <p className="mt-1 text-slate-500">已退回</p>
         </div>
       </div>
@@ -89,19 +126,24 @@ export default function ReviewsPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <select className="rounded border px-4 py-3 text-base" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          {STATUSES.map((s) => <option key={s}>{s}</option>)}
+          {REVIEW_STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200"
           onClick={() => { setSearch(''); setFilterStatus('全部'); }}>清除篩選</button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">無法載入覆核資料：{error}</div>
+      )}
+
       {/* 覆核列表 */}
       <div className="grid gap-4">
-        {filtered.length === 0 && (
+        {loading && <div className="rounded-lg border bg-white p-8 text-center text-slate-400">載入中…</div>}
+        {!loading && filtered.length === 0 && (
           <div className="rounded-lg border bg-white p-8 text-center text-slate-400">無符合條件的覆核記錄</div>
         )}
         {filtered.map((r) => (
-          <div key={r.id} className={`rounded-lg border bg-white p-5 ${selectedId === r.id ? 'border-blue-400 ring-2 ring-blue-200' : 'hover:border-slate-300'}`}>
+          <div key={r.caseId} className={`rounded-lg border bg-white p-5 ${selectedId === r.caseId ? 'border-blue-400 ring-2 ring-blue-200' : 'hover:border-slate-300'}`}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3">
@@ -112,7 +154,7 @@ export default function ReviewsPage() {
                 </div>
                 <p className="mt-1 text-slate-600">
                   送審人：<span className="font-medium">{r.submitter}</span>
-                  <span className="ml-3 text-slate-400">{r.submittedAt}</span>
+                  {r.submittedAt && <span className="ml-3 text-slate-400">{r.submittedAt}</span>}
                 </p>
                 {r.reviewedAt && (
                   <p className="text-slate-600">
@@ -133,16 +175,16 @@ export default function ReviewsPage() {
                 {r.status === '待覆核' && (
                   <button
                     className="rounded bg-blue-600 px-4 py-2 text-white text-sm hover:bg-blue-700"
-                    onClick={() => setSelectedId(selectedId === r.id ? null : r.id)}
+                    onClick={() => setSelectedId(selectedId === r.caseId ? null : r.caseId)}
                   >
-                    {selectedId === r.id ? '收起' : '開始覆核'}
+                    {selectedId === r.caseId ? '收起' : '開始覆核'}
                   </button>
                 )}
               </div>
             </div>
 
             {/* 覆核操作面板 */}
-            {selectedId === r.id && r.status === '待覆核' && (
+            {selectedId === r.caseId && r.status === '待覆核' && (
               <div className="mt-4 border-t pt-4">
                 <div className="flex gap-3">
                   <Link href={`/cases/${r.caseId}`}>
@@ -160,13 +202,21 @@ export default function ReviewsPage() {
                   />
                 </div>
                 <div className="mt-3 flex gap-3">
-                  <button className="rounded bg-green-600 px-6 py-3 text-white font-semibold hover:bg-green-700">
+                  <button
+                    className="rounded bg-green-600 px-6 py-3 text-white font-semibold hover:bg-green-700 disabled:opacity-50"
+                    disabled={submitting}
+                    onClick={() => handleApprove(r.caseId)}
+                  >
                     ✓ 核准通過
                   </button>
-                  <button className="rounded bg-red-600 px-6 py-3 text-white font-semibold hover:bg-red-700">
+                  <button
+                    className="rounded bg-red-600 px-6 py-3 text-white font-semibold hover:bg-red-700 disabled:opacity-50"
+                    disabled={submitting || !rejectReason.trim()}
+                    onClick={() => handleReject(r.caseId)}
+                  >
                     ✗ 退回修改
                   </button>
-                  <button className="rounded bg-slate-200 px-4 py-3 hover:bg-slate-300" onClick={() => setSelectedId(null)}>
+                  <button className="rounded bg-slate-200 px-4 py-3 hover:bg-slate-300" onClick={() => { setSelectedId(null); setRejectReason(''); }}>
                     取消
                   </button>
                 </div>

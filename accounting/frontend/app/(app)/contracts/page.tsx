@@ -1,17 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
-
-const contracts = [
-  { id: 'CT001', client: '宏達貿易', clientId: 'C001', type: '年度記帳合約', startDate: '2026-01-01', endDate: '2026-12-31', monthlyFee: 8000, status: '有效', signedAt: '2025-12-15' },
-  { id: 'CT002', client: '新光物流', clientId: 'C002', type: '申報代理合約', startDate: '2026-01-01', endDate: '2026-06-30', monthlyFee: 5000, status: '即將到期', signedAt: '2025-12-20' },
-  { id: 'CT003', client: '全台科技', clientId: 'C003', type: '年度記帳合約', startDate: '2026-01-01', endDate: '2026-12-31', monthlyFee: 7500, status: '有效', signedAt: '2025-12-10' },
-  { id: 'CT004', client: '信義建設', clientId: 'C004', type: '年度顧問合約', startDate: '2026-05-01', endDate: '2027-04-30', monthlyFee: 12000, status: '有效', signedAt: '2026-04-28' },
-  { id: 'CT005', client: '松山食品', clientId: 'C005', type: '年度記帳合約', startDate: '2026-01-01', endDate: '2026-12-31', monthlyFee: 6000, status: '有效', signedAt: '2025-12-18' },
-  { id: 'CT006', client: '大安診所', clientId: 'C006', type: '年度記帳合約', startDate: '2026-01-01', endDate: '2026-12-31', monthlyFee: 9000, status: '有效', signedAt: '2025-12-05' },
-  { id: 'CT007', client: '宏達貿易', clientId: 'C001', type: '年度記帳合約', startDate: '2025-01-01', endDate: '2025-12-31', monthlyFee: 7500, status: '已到期', signedAt: '2024-12-20' },
-  { id: 'CT008', client: '北投溫泉飯店', clientId: 'C007', type: '申報代理合約', startDate: '2023-01-01', endDate: '2024-12-31', monthlyFee: 10000, status: '已終止', signedAt: '2022-12-15' },
-];
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 const STATUS_COLORS: Record<string, string> = {
   有效: 'bg-green-100 text-green-800',
@@ -23,20 +13,31 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUSES = ['全部', '有效', '即將到期', '已到期', '已終止'];
 
 export default function ContractsPage() {
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('全部');
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+    api.get('/contracts')
+      .then((res) => setContracts(res.data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
   const filtered = contracts.filter((c) => {
     const matchStatus = filterStatus === '全部' || c.status === filterStatus;
-    const matchSearch = c.client.includes(search) || c.id.includes(search) || c.type.includes(search);
+    const matchSearch = c.clientName?.includes(search) || c.id.includes(search) || c.type?.includes(search);
     return matchStatus && matchSearch;
   });
 
   const active = contracts.filter((c) => c.status === '有效').length;
   const expiring = contracts.filter((c) => c.status === '即將到期').length;
   const expired = contracts.filter((c) => c.status === '已到期' || c.status === '已終止').length;
-  const totalMonthly = contracts.filter((c) => c.status === '有效' || c.status === '即將到期')
-    .reduce((sum, c) => sum + c.monthlyFee, 0);
+  const totalMonthly = contracts
+    .filter((c) => c.status === '有效' || c.status === '即將到期')
+    .reduce((sum, c) => sum + (c.monthlyFee ?? 0), 0);
 
   return (
     <main className="space-y-5 text-base">
@@ -48,15 +49,15 @@ export default function ContractsPage() {
       {/* 統計 */}
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-green-600">{active}</p>
+          <p className="text-3xl font-bold text-green-600">{loading ? '…' : active}</p>
           <p className="mt-1 text-slate-500">有效合約</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-orange-600">{expiring}</p>
+          <p className="text-3xl font-bold text-orange-600">{loading ? '…' : expiring}</p>
           <p className="mt-1 text-slate-500">即將到期</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
-          <p className="text-3xl font-bold text-slate-400">{expired}</p>
+          <p className="text-3xl font-bold text-slate-400">{loading ? '…' : expired}</p>
           <p className="mt-1 text-slate-500">已到期/終止</p>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
@@ -80,6 +81,10 @@ export default function ContractsPage() {
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => { setSearch(''); setFilterStatus('全部'); }}>清除篩選</button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">無法載入合約：{error}</div>
+      )}
+
       {/* 合約表格 */}
       <div className="rounded-lg border bg-white overflow-hidden">
         <table className="w-full">
@@ -96,17 +101,18 @@ export default function ContractsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && <tr><td colSpan={8} className="p-8 text-center text-slate-400">載入中…</td></tr>}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={8} className="p-8 text-center text-slate-400">無符合條件的合約</td></tr>
             )}
             {filtered.map((c) => (
               <tr key={c.id} className={`border-t hover:bg-slate-50 ${c.status === '即將到期' ? 'bg-orange-50' : ''}`}>
                 <td className="px-4 py-3 font-mono text-sm">{c.id}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/clients/${c.clientId}`} className="text-blue-600 hover:underline font-medium">{c.client}</Link>
+                  <Link href={`/clients/${c.clientId}`} className="text-blue-600 hover:underline font-medium">{c.clientName}</Link>
                 </td>
                 <td className="px-4 py-3">{c.type}</td>
-                <td className="px-4 py-3 text-right font-semibold">NT$ {c.monthlyFee.toLocaleString()}</td>
+                <td className="px-4 py-3 text-right font-semibold">NT$ {c.monthlyFee?.toLocaleString()}</td>
                 <td className="px-4 py-3 text-sm">{c.startDate} ～ {c.endDate}</td>
                 <td className="px-4 py-3 text-sm text-slate-500">{c.signedAt}</td>
                 <td className="px-4 py-3">
