@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-const today = '2026-05-18';
+const getToday = () => new Date().toISOString().split('T')[0];
 
 const casesData = [
   { id: 'A001', clientName: '宏達貿易', owner: '陳美玲', status: '退回修改', dueDate: '2026-05-20', month: '2026-05' },
@@ -15,12 +15,12 @@ const casesData = [
 ];
 
 const tasksData = [
-  { id: 'T001', title: '整理宏達貿易5月進項憑證', assignee: '陳美玲', status: '進行中', dueDate: '2026-05-17', priority: '高' },
-  { id: 'T002', title: '補件：新光物流扣繳憑單', assignee: '王志明', status: '進行中', dueDate: '2026-05-17', priority: '高' },
-  { id: 'T003', title: '全台科技5月薪資計算', assignee: '林佳慧', status: '待處理', dueDate: '2026-05-22', priority: '中' },
-  { id: 'T004', title: '整理信義建設固定資產折舊', assignee: '李建宏', status: '待處理', dueDate: '2026-05-28', priority: '低' },
-  { id: 'T005', title: '大安診所5月銷項對帳', assignee: '張淑芬', status: '逾期', dueDate: '2026-05-15', priority: '高' },
-  { id: 'T007', title: '松山食品員工勞健保加退保', assignee: '林佳慧', status: '待處理', dueDate: '2026-05-20', priority: '中' },
+  { id: 'T001', title: '整理宏達貿易5月進項憑證', assigneeId: 'E003', assignee: '陳美玲', status: '進行中', dueDate: '2026-05-17', priority: '高' },
+  { id: 'T002', title: '補件：新光物流扣繳憑單', assigneeId: 'E004', assignee: '王志明', status: '進行中', dueDate: '2026-05-17', priority: '高' },
+  { id: 'T003', title: '全台科技5月薪資計算', assigneeId: 'E006', assignee: '林佳慧', status: '待處理', dueDate: '2026-05-22', priority: '中' },
+  { id: 'T004', title: '整理信義建設固定資產折舊', assigneeId: 'E007', assignee: '李建宏', status: '待處理', dueDate: '2026-05-28', priority: '低' },
+  { id: 'T005', title: '大安診所5月銷項對帳', assigneeId: 'E002', assignee: '張淑芬', status: '逾期', dueDate: '2026-05-15', priority: '高' },
+  { id: 'T007', title: '松山食品員工勞健保加退保', assigneeId: 'E006', assignee: '林佳慧', status: '待處理', dueDate: '2026-05-20', priority: '中' },
 ];
 
 const paymentsData = [
@@ -40,6 +40,8 @@ const notificationsData = [
 @Injectable()
 export class DashboardService {
   getStats(employeeId?: string) {
+    const today = getToday();
+
     const overdueCases = casesData.filter(
       (c) => !['已申報', '歸檔', '結案'].includes(c.status) && c.dueDate < today,
     );
@@ -49,7 +51,7 @@ export class DashboardService {
     const waitingData = casesData.filter((c) => c.status === '等待資料');
 
     const myTasks = employeeId
-      ? tasksData.filter((t) => t.status !== '完成')
+      ? tasksData.filter((t) => t.assigneeId === employeeId && t.status !== '完成')
       : tasksData.filter((t) => t.status !== '完成');
 
     const overdueTasks = tasksData.filter((t) => t.status === '逾期' || (t.dueDate < today && t.status !== '完成'));
@@ -75,6 +77,7 @@ export class DashboardService {
       myTasks: myTasks.slice(0, 5).map((t) => ({
         id: t.id,
         title: t.title,
+        assignee: t.assignee,
         status: t.status,
         priority: t.priority,
         dueDate: t.dueDate,

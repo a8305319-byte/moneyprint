@@ -18,6 +18,7 @@ export default function PaymentsPage() {
   const [filterMonth, setFilterMonth] = useState('全部');
   const [filterStatus, setFilterStatus] = useState('全部');
   const [search, setSearch] = useState('');
+  const [markingIds, setMarkingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.get('/payments')
@@ -41,10 +42,16 @@ export default function PaymentsPage() {
   const unpaidCount = filtered.filter((p) => p.status !== '已收款').length;
 
   const handleMarkPaid = (id: string) => {
+    if (markingIds.has(id)) return;
+    setMarkingIds((prev) => new Set([...prev, id]));
     const user = getUser();
-    api.patch(`/payments/${id}/paid`, { method: '匯款', lastModifiedBy: user?.name ?? '' }).then((res) => {
-      setPayments((prev) => prev.map((p) => p.id === id ? res.data : p));
-    });
+    api.patch(`/payments/${id}/paid`, { method: '匯款', lastModifiedBy: user?.name ?? '' })
+      .then((res) => {
+        setPayments((prev) => prev.map((p) => p.id === id ? res.data : p));
+      })
+      .finally(() => {
+        setMarkingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+      });
   };
 
   return (
@@ -142,10 +149,11 @@ export default function PaymentsPage() {
                 <td className="px-4 py-3">
                   {p.status !== '已收款' ? (
                     <button
-                      className="rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
+                      className="rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+                      disabled={markingIds.has(p.id)}
                       onClick={() => handleMarkPaid(p.id)}
                     >
-                      標記已收
+                      {markingIds.has(p.id) ? '處理中…' : '標記已收'}
                     </button>
                   ) : (
                     <span className="text-slate-400 text-sm">已收</span>

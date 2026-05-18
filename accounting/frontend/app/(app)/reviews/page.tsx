@@ -73,6 +73,8 @@ export default function ReviewsPage() {
       });
       setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, status: '已申報', lastModifiedBy: user?.name } : c));
       setSelectedId(null);
+    } catch (err: any) {
+      alert(err.message ?? '核准失敗，請稍後再試');
     } finally {
       setSubmitting(false);
     }
@@ -89,6 +91,8 @@ export default function ReviewsPage() {
       setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, status: '退回修改', rejectReason, lastModifiedBy: user?.name } : c));
       setSelectedId(null);
       setRejectReason('');
+    } catch (err: any) {
+      alert(err.message ?? '退回失敗，請稍後再試');
     } finally {
       setSubmitting(false);
     }

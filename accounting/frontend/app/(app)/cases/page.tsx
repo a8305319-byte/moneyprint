@@ -18,9 +18,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUSES = ['全部', '建立', '指派', '等待資料', '收到資料', '處理中', '送主管覆核', '退回修改', '待申報', '已申報', '歸檔', '結案'];
-const OWNERS = ['全部', '陳美玲', '王志明', '林佳慧', '李建宏', '張淑芬'];
-
-const today = '2026-05-18';
 
 export default function CasesPage() {
   const [cases, setCases] = useState<any[]>([]);
@@ -36,6 +33,9 @@ export default function CasesPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const today = new Date().toISOString().split('T')[0];
+  const owners = ['全部', ...Array.from(new Set(cases.map((c) => c.owner).filter(Boolean)))];
 
   const filtered = cases.filter((c) => {
     const matchSearch = c.id.includes(search) || c.clientName.includes(search) || c.type.includes(search);
@@ -84,7 +84,7 @@ export default function CasesPage() {
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
         <select className="rounded border px-4 py-3 text-base" value={filterOwner} onChange={(e) => setFilterOwner(e.target.value)}>
-          {OWNERS.map((o) => <option key={o}>{o}</option>)}
+          {owners.map((o) => <option key={o}>{o}</option>)}
         </select>
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200" onClick={() => window.print()}>列印</button>
         <button className="rounded bg-slate-100 px-4 py-3 hover:bg-slate-200"

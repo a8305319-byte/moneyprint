@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 let idCounter = 8;
@@ -56,9 +56,11 @@ export class NotificationsService {
     ).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  markRead(id: string) {
+  markRead(id: string, requesterId: string) {
     const i = notifications.findIndex((n) => n.id === id && !n.deletedAt);
     if (i === -1) throw new NotFoundException('找不到通知');
+    const n = notifications[i];
+    if (n.recipientId !== null && n.recipientId !== requesterId) throw new ForbiddenException('無權限');
     notifications[i].read = true;
     return notifications[i];
   }

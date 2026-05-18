@@ -4,6 +4,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  if (!process.env.JWT_SECRET) {
+    console.warn('[Auth] 警告：JWT_SECRET 環境變數未設定，使用預設弱金鑰，請在正式環境中設定此變數！');
+  }
+
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');

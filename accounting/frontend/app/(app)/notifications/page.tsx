@@ -25,8 +25,7 @@ export default function NotificationsPage() {
   const user = getUser();
 
   useEffect(() => {
-    const query = user ? `?recipientId=${user.id}` : '';
-    api.get(`/notifications${query}`)
+    api.get('/notifications')
       .then((res) => setNotifications(res.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -39,7 +38,7 @@ export default function NotificationsPage() {
   };
 
   const markAllRead = () => {
-    api.patch('/notifications/read-all', { recipientId: user?.id }).then(() => {
+    api.patch('/notifications/read-all', {}).then(() => {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     });
   };
