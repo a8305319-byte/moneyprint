@@ -9,6 +9,10 @@ import { CasesModule } from './cases/cases.module';
 import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SalaryModule } from './salary/salary.module';
+import { FilingsModule } from './filings/filings.module';
+import { ContractsModule } from './contracts/contracts.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -22,6 +26,10 @@ import { DashboardModule } from './dashboard/dashboard.module';
     TasksModule,
     NotificationsModule,
     DashboardModule,
+    SalaryModule,
+    FilingsModule,
+    ContractsModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}
