@@ -5,6 +5,10 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { EmployeesModule } from './employees/employees.module';
 import { ClientsModule } from './clients/clients.module';
+import { CasesModule } from './cases/cases.module';
+import { TasksModule } from './tasks/tasks.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -14,6 +18,10 @@ import { ClientsModule } from './clients/clients.module';
     AuthModule,
     EmployeesModule,
     ClientsModule,
+    CasesModule,
+    TasksModule,
+    NotificationsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
